@@ -70,6 +70,8 @@ interface Session {
   gen: number;
   replying: boolean;
   personaSpeakingUntil: number;
+  /** The persona turn whose audio may still be playing, so its real end can be recorded. */
+  speakingTurn: { id: string; startMs: number } | null;
   lastActivityAt: number;
   agentBuffer: { text: string; startMs: number; endMs: number }[];
   settleTimer: ReturnType<typeof setTimeout> | null;
@@ -115,6 +117,7 @@ function newSession(callId: string, agentId: string, persona: Persona, scenario:
     gen: 0,
     replying: false,
     personaSpeakingUntil: 0,
+    speakingTurn: null,
     lastActivityAt: Date.now(),
     agentBuffer: [],
     settleTimer: null,
@@ -244,6 +247,7 @@ async function speak(s: Session, text: string) {
     setTimeout(() => audioStore.delete(key), 10 * 60_000);
   }
   s.personaSpeakingUntil = Date.now() + durationMs;
+  s.speakingTurn = { id: turn.id, startMs };
   broadcast(s, { type: "persona_state", state: "speaking" });
   broadcast(s, { type: "turn", turn });
   broadcast(s, {
@@ -412,6 +416,7 @@ export async function handleClientMessage(callId: string, msg: SimClientMessage)
       return;
     }
     case "interrupt": {
+      if (s.speakingTurn && now < s.personaSpeakingUntil) closeSpeakingTurn(s);
       if (now < s.personaSpeakingUntil || s.replying) {
         s.gen++;
         s.replying = false;
@@ -423,12 +428,21 @@ export async function handleClientMessage(callId: string, msg: SimClientMessage)
       return;
     }
     case "playback_ended": {
+      if (s.speakingTurn?.id === msg.turnId) closeSpeakingTurn(s);
       s.personaSpeakingUntil = Math.min(s.personaSpeakingUntil, now);
       s.lastActivityAt = now;
       if (!s.replying) broadcast(s, { type: "persona_state", state: "idle" });
       return;
     }
   }
+}
+
+/** Replace the estimated end of the persona's current line with the real one. */
+function closeSpeakingTurn(s: Session) {
+  const t = s.speakingTurn;
+  if (!t) return;
+  s.speakingTurn = null;
+  void calls.setTurnEnd(t.id, Math.max(t.startMs + 300, elapsed(s))).catch((e) => console.error("[sim] turn end", e));
 }
 
 function sameValue(a: unknown, b: unknown): boolean {

@@ -147,8 +147,8 @@ async function withFallback(job: LlmJob, run: (p: LlmProvider) => Promise<string
     try {
       return await run(primary);
     } catch (e) {
-      // No other provider to fall back to: back off once on a rate limit and retry the same one.
-      if (!(e instanceof HttpError && e.status === 429) || (ENV.LLM_FALLBACK && providers()[secondary].apiKey)) throw e;
+      // No other provider to fall back to: back off once on a rate limit / overload and retry the same one.
+      if (!retryable(e) || (ENV.LLM_FALLBACK && providers()[secondary].apiKey)) throw e;
       await Bun.sleep(1500);
       return await run(primary);
     }

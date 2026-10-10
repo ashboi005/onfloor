@@ -126,6 +126,11 @@ export const calls = {
     return toTurn(row!);
   },
 
+  /** Corrects a turn's end once the real value is known (sim persona playback finished / was cut off). */
+  async setTurnEnd(turnId: string, endMs: number) {
+    await db.update(transcriptTurns).set({ endMs }).where(eq(transcriptTurns.id, turnId));
+  },
+
   async end(callId: string, status: CallStatus = "scoring"): Promise<Call> {
     const call = await calls.get(callId);
     const endedAt = new Date();
