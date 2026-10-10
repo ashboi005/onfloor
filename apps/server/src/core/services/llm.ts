@@ -108,7 +108,8 @@ async function complete(
 ): Promise<string> {
   const cfg = providers()[provider];
   if (!cfg.apiKey) throw new AppError("LLM_UNAVAILABLE", { message: `${provider} has no API key configured.` });
-  const model = cfg.models[input.tier ?? DEFAULT_TIER[input.job]];
+  const tier = input.tier ?? DEFAULT_TIER[input.job];
+  const model = cfg.models[tier];
 
   const res = await fetch(`${cfg.baseUrl.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
@@ -119,6 +120,7 @@ async function complete(
       messages: input.messages,
       ...(input.temperature !== undefined && { temperature: input.temperature }),
       ...(input.maxTokens !== undefined && { max_tokens: input.maxTokens }),
+      ...(tier === "scoring" && ENV.LLM_SCORING_REASONING !== "none" && { reasoning_effort: ENV.LLM_SCORING_REASONING }),
       ...(responseFormat && {
         response_format: {
           type: "json_schema",
@@ -142,7 +144,14 @@ async function withFallback(job: LlmJob, run: (p: LlmProvider) => Promise<string
   const primary = providerFor(job);
   const secondary: LlmProvider = primary === "merge" ? "gemini" : "merge";
   try {
-    return await run(primary);
+    try {
+      return await run(primary);
+    } catch (e) {
+      // No other provider to fall back to: back off once on a rate limit and retry the same one.
+      if (!(e instanceof HttpError && e.status === 429) || (ENV.LLM_FALLBACK && providers()[secondary].apiKey)) throw e;
+      await Bun.sleep(1500);
+      return await run(primary);
+    }
   } catch (e) {
     if (ENV.LLM_FALLBACK && retryable(e) && providers()[secondary].apiKey) {
       console.warn(`[llm] ${job}: ${primary} failed (${(e as Error).message.slice(0, 80)}), falling back to ${secondary}`);

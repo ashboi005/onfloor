@@ -44,7 +44,8 @@
     "auth:generate": "cd apps/server && bun run auth:generate",
     "db:seed": "bun run --filter server db:seed",
     "db:start": "docker compose up -d db",
-    "contracts:jsonschema": "bun run --filter @onfloor/contracts jsonschema"
+    "contracts:jsonschema": "bun run --filter @onfloor/contracts jsonschema",
+    "llm:check": "bun run --filter server llm:check"
   },
   "dependencies": {
     "zod": "catalog:"

@@ -10,7 +10,8 @@
     "start": "bun run dist/index.mjs",
     "env:generate": "varlock codegen",
     "auth:generate": "varlock run -- bun x auth@latest generate --config src/services.ts --output ../../packages/db/src/schema/auth.ts --yes",
-    "db:seed": "bun src/scripts/seed.ts"
+    "db:seed": "bun src/scripts/seed.ts",
+    "llm:check": "bun src/scripts/llm-check.ts"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.2",
