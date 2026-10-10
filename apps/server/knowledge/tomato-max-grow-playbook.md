@@ -34,17 +34,15 @@ Max Grow is billed entirely on incremental sales.
 The merchant's existing sales (up to the DRR) are never charged. Only the extra sales that
 Max Grow helps bring in are.
 
-## Worked examples (use the merchant's own DRR from Nugget)
+## Worked examples (use the merchant's own DRR from Nugget; keep the numbers round)
 
 | DRR (₹/day) | Average daily sales during the campaign | Incremental (₹/day) | Commission per day (20%) | Per week (7 days) |
 |---|---|---|---|---|
 | 100 | 200 | 100 | 20 | 140 |
-| 4,300 | 5,300 | 1,000 | 200 | 1,400 |
-| 9,800 | 12,800 | 3,000 | 600 | 4,200 |
-| 14,200 | 18,200 | 4,000 | 800 | 5,600 |
-| 22,800 | 27,800 | 5,000 | 1,000 | 7,000 |
-| 38,500 | 44,500 | 6,000 | 1,200 | 8,400 |
-| 14,200 | 14,000 | 0 | 0 | 0 (no deduction) |
+| 200 | 300 | 100 | 20 | 140 |
+| 300 | 500 | 200 | 40 | 280 |
+| 500 | 1,000 | 500 | 100 | 700 |
+| 100 | 90 | 0 | 0 | 0 (no deduction) |
 
 The merchant always keeps 80% of every extra rupee. When sales don't go above the DRR, nothing is
 deducted at all.
@@ -53,10 +51,10 @@ deducted at all.
 
 **"How much will you cut?"**
 20%, and only on the extra sales above your current daily average (your DRR). "Sir, your DRR is
-₹14,200. If your daily sales go to ₹18,200, the extra is ₹4,000, and 20% of that is ₹800 a day."
+₹100. If your daily sales go to ₹200, the extra is ₹100, and 20% of that is ₹20 a day."
 
 **"What if my sales don't increase?"**
-Then nothing is deducted. "If your sales stay at or below ₹14,200 a day, there is zero deduction."
+Then nothing is deducted. "If your sales stay at or below ₹100 a day, there is zero deduction."
 
 **"When and how do you deduct it?"**
 Weekly, settled directly from the Tomato payout. Nothing upfront.

@@ -17,10 +17,6 @@ export default function Landing() {
         <CrowdCanvas src="https://cdn.21st.dev/assets/localized/abdb8990a7bef8c2f5af3e45f0a3c969c4b0603fba8be92e81347de4ea4e1ed7.png" rows={15} cols={7} />
         
         <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center">
-          <div className="inline-flex items-center rounded-full border px-3 py-1 text-sm text-muted-foreground mb-6 bg-background/60 backdrop-blur-md">
-            <span className="flex h-2 w-2 rounded-full bg-green-500 mr-2"></span>
-            Live Copilot is now in beta
-          </div>
           <div className="w-full h-[250px] md:h-[400px] relative mb-2 invert dark:invert-0">
             <TechText
               text="OnFloor"

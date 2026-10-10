@@ -71,13 +71,19 @@ const judgementSchema = z.object({
 });
 type Judgement = z.infer<typeof judgementSchema>;
 
+/**
+ * Linear and forgiving by design: the customer is an unpredictable AI (or a real person), so the
+ * agent can't know what's coming and real calls never follow the script word for word. Start
+ * from "competent", move in proportion to impact, and keep low scores for calls that actually
+ * went wrong.
+ */
 const RUBRIC: Record<(typeof JUDGED)[number], string> = {
   objectionHandling:
-    "0-20: ignored, talked over or capitulated instantly. 40-60: acknowledged and gave a generic answer. 80-100: found the real concern under the objection and answered it specifically with evidence, protecting value instead of discounting.",
+    "Start at 85 if the agent answered the customer's questions and concerns reasonably. Up to 100 for answers that were specific and convincing. Subtract in proportion to impact: about 5-10 per question that was dodged or answered vaguely. Below 50 only if the agent ignored the customer, caved on price, or lost a winnable deal through their own handling.",
   compliance:
-    "Adherence to the POLICIES list and mandatory disclosures. Any critical policy breach caps this at 40. 100 only if every applicable policy was followed.",
+    "Start at 90 if the plan was explained correctly. A wording difference or a skipped line from the script is not a breach (at most -5). A critical policy breach costs about 25 if the agent corrected it on the same call, and caps the score at 60 if it was never corrected. 100 if every applicable rule was followed.",
   softSkills:
-    "Pace, clarity, listening, tone, not monologuing, not interrupting, handling silence. Use the STATS as evidence. 0-20: rambling or rude. 40-60: understandable but unstructured. 80-100: clear, concise, adapted to this customer.",
+    "Start at 80 for a clear, polite call. Up to 100 for one that is warm, concise and adapted to this customer. Subtract a few points per real problem (long monologue, talking over the customer, long silence); use the STATS. Below 50 only if the agent was rude, confusing or kept rambling.",
 };
 
 /** Weighted mean over applicable dimensions. Arithmetic, never asked of the LLM. */
@@ -163,9 +169,9 @@ ${JUDGED.map((k) => `## ${k} (${SCORE_DIMENSION_LABELS[k]})\n${RUBRIC[k]}`).join
 ${
     qa.length
       ? `# QA DEDUCTIONS (the penalised report card)
-Report each infraction that clearly happened, at most once per code, with the turn id where it happened (null if it's an omission across the whole call) and one sentence of detail quoting the agent:
+Report an infraction only when it clearly and substantially happened, at most once per code, with the turn id where it happened (null if it's an omission across the whole call) and one sentence of detail quoting the agent. When in doubt, don't report it:
 ${qa.map((r) => `- ${r.code}: ${r.detail}`).join("\n")}
-Only report what the AGENT did or failed to do. A correct statement of the plan is never plan_misrepresented. If the customer never complained, empathy_missing does not apply. If the call ended before the agent could close (customer hung up abruptly), closing_line does not apply.
+Only report what the AGENT did or failed to do. Paraphrasing a standard line is fine; only a line that is missing altogether counts. A correct statement of the plan, or a slip the agent corrected on the call, is never plan_misrepresented. If the customer never complained, empathy_missing does not apply. If the call ended before the agent could close (customer hung up abruptly), closing_line does not apply.
 
 `
       : ""
@@ -181,7 +187,10 @@ ${
     input.kind === "live"
       ? `# LIVE CALL: NO CRM\nThis was a real call; the agent had no CRM open. If the customer asked for an account change, a clear verbal acknowledgement ("sure, I'll do that") is the correct handling. Never mark it as ignored or not actioned. Only judge what was said.\n\n`
       : ""
-  }# ACCURACY RULES
+  }# HOW STRICT TO BE
+The customer is unpredictable and the agent cannot know what is coming; real calls don't follow the script line by line. Judge the outcome and the big things: was the merchant told the plan correctly, were their questions answered, was the deal won (or lost through the agent's own mistakes), were the tools and disposition right. Skipping or rewording one step is a small thing. Grade linearly: each problem costs in proportion to its impact, and low scores are only for calls that went clearly wrong.
+
+# ACCURACY RULES
 - Only flag a policy breach if the AGENT's own words in that turn breach it. Quote the number or promise in the detail (e.g. "said 15% commission", "offered 10% instead"). What the customer demanded or misquoted is not the agent's breach; correcting the customer is good.
 - Never produce two moments that contradict each other.
 

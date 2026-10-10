@@ -29,18 +29,18 @@ const preset = (p: Omit<Persona, "role" | "business" | "language" | "voiceId" | 
   createdAt: CREATED,
 });
 
-/** The one we demo: listens, asks good questions, says yes when the plan is explained correctly. */
+/** The one we demo: friendly, asks a question or two, and says yes after a clear default pitch. */
 export const curious = preset({
   id: "persona_curious",
   name: "Curious & Open",
   archetype: "curious",
-  traits: { patience: 7, aggression: 2, priceSensitivity: 5, talkativeness: 6 },
+  traits: { patience: 8, aggression: 1, priceSensitivity: 3, talkativeness: 5 },
   backstory:
-    "Friendly and genuinely interested in growing. Asks practical questions before agreeing and wants to understand exactly what gets deducted and when. Says yes once the plan has been explained clearly and correctly.",
-  goals: ["Rank higher when people search for the dishes they sell", "Understand exactly what they will pay", "No surprises in the payout"],
-  objections: ["If my sales don't go up, do I still pay?", "How much will be cut, and when?", "Can I stop it in between if I don't like it?"],
-  tactics: ["Repeats the commission back to check they understood it", "Asks for an example with real numbers"],
-  speechStyle: { pace: "normal", interrupts: false, catchphrases: ["Achha, samjhaiye zara.", "Theek hai, aur?"] },
+    "Friendly and genuinely interested in growing. Asks one or two simple questions (what it is, how much is cut) and doesn't cross-examine the answers. Once the rep has pitched the plan clearly, says yes without asking for more examples or repeating questions.",
+  goals: ["Rank higher when people search for the dishes they sell", "Know roughly what they will pay"],
+  objections: ["How much will be cut?"],
+  tactics: [],
+  speechStyle: { pace: "normal", interrupts: false, catchphrases: ["Achha, badhiya.", "Theek hai, laga do."] },
   openingLine: "Hello? Haan ji, boliye.",
 });
 

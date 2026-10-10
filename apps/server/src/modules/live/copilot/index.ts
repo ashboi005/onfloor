@@ -19,7 +19,9 @@ const customerAnalysis = z.object({
   hint: hintSchema.pick({ kind: true, title: true, body: true }).nullable(),
   patience: pct, frustration: pct, engagement: pct,
 });
-const agentAnalysis = z.object({ alerts: z.array(guardrailAlertSchema.pick({ policyId: true, message: true })) });
+// [updated by Ashwath] Each alert must quote the agent's own words; alerts whose quote isn't in the
+// turn are dropped (the model was inventing violations).
+const agentAnalysis = z.object({ alerts: z.array(guardrailAlertSchema.pick({ policyId: true, message: true }).extend({ quote: z.string() })) });
 type State = {
   turns: TranscriptTurn[]; fired: Set<string>; hints: Hint[]; metrics: TalkMetrics;
   customerKey?: string;
@@ -50,7 +52,10 @@ function alert(callId: string, policyId: string, message: string, triggerTurnId:
   const policy = LIVE_POLICIES.find((p) => p.id === policyId);
   if (!policy || fired.has(policyId)) return;
   fired.add(policyId);
-  hub.emit(callId, { type: "guardrail", alert: { id: `guard_${crypto.randomUUID()}`, severity: policy.severity,
+  // [updated by Ashwath] Shown as a warning on the HUD, never the full-screen critical banner: the
+  // agent is mid-call and a scary red alarm hurts more than it helps. Scoring still uses the
+  // policy's real severity.
+  hub.emit(callId, { type: "guardrail", alert: { id: `guard_${crypto.randomUUID()}`, severity: "warn",
     policyId, message, triggerTurnId } });
 }
 
@@ -89,11 +94,15 @@ export function onFinal(callId: string, turn: TranscriptTurn) {
     state.fired = new Set();
     void services.llm.json({ job: "copilot", tier: "fast", schemaName: "live_agent_guardrails", schema: agentAnalysis,
       timeoutMs: 12_000, maxTokens: 400, temperature: 0,
-      messages: [{ role: "system", content: `${system}\nFind actual violations in the latest AGENT turn. Refusals, quotes, conditional offers subject to approval, and genuine approval requests are not violations. Check disclosure against the preceding context. Return alerts (empty if none).` },
+      messages: [{ role: "system", content: `${system}\nFind actual violations in the latest AGENT turn only. Be conservative: report a violation only when the agent's own words clearly state something the policies forbid (e.g. a commission other than 20%, a discount, a guarantee of orders). Correct statements of the plan, refusals, the agent repeating or correcting what the customer said, quotes, conditional offers subject to approval, and approval requests are NOT violations. Never report something that wasn't said. For each alert give quote = the exact words from the latest agent turn that break the policy. Return alerts (empty if none, which is the usual case).` },
         { role: "user", content: context }],
     }).then((result) => {
       if (!state.active) return;
-      for (const violation of result.alerts) alert(callId, violation.policyId, violation.message, turn.id, fired);
+      const said = turn.text.toLowerCase();
+      for (const violation of result.alerts) {
+        if (!violation.quote.trim() || !said.includes(violation.quote.trim().toLowerCase())) continue; // not actually said
+        alert(callId, violation.policyId, violation.message, turn.id, fired);
+      }
     }).catch((error) => console.warn("[live] agent policy analysis failed", error instanceof Error ? error.name : "unknown"));
     return;
   }

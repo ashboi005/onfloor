@@ -104,13 +104,13 @@ const HISTORY: HistoryCall[] = [
       {
         actor: "agent",
         kind: "campaign_launch",
-        body: { ok: true, error: null, campaign: { uid: sharmaJi.uid, email: "orders@sharmajichholebhature.in", campaignType: "max_grow", startDate: d, endDate: addMonths(d, 1) } },
+        body: { ok: true, error: null, campaign: { uid: sharmaJi.uid, email: sharmaJi.email, campaignType: "max_grow", startDate: d, endDate: addMonths(d, 1) } },
         atMs: 107000,
       },
-      { actor: "agent", kind: "email_sent", body: { template: "campaign_accepted", callback: null, to: "orders@sharmajichholebhature.in" }, atMs: 160000 },
+      { actor: "agent", kind: "email_sent", body: { template: "campaign_accepted", callback: null, to: sharmaJi.email }, atMs: 160000 },
       { actor: "agent", kind: "dispose", body: { outcome: "accepted", callback: null, secondsTaken: 41 }, atMs: 172500 },
     ],
-    voiced: [{ requestId: "req_email", atMs: 39000 }],
+    voiced: [],
   },
   {
     slug: "thali",

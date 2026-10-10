@@ -17,10 +17,10 @@ specific section of the Tomato policy document from RAG
 | 3 | Agent | Sir, aap restaurant ke owner hain na, financial decisions aap hi lete hain? | (Decision-maker check) |
 | 4 | Customer | Haan, sab main hi dekhta hoon. Par ek baat, **naye restaurants search mein upar dikhte hain, mera kaise upar aayega**? | Keyword hint "How to get more visibility" + grounded hint from the visibility guide 📘 |
 | 5 | Agent | Sir, teen cheezein: menu quality improve kijiye, menu mein photos daaliye, aur orders kam reject kijiye. Aur hamara Max Grow plan aapko search aur top-selling list mein sabse upar le aata hai. | |
-| 6 | Customer | Achha. **Isme kitna katega**? | Keyword hint "How much is cut" (20% of incremental: DRR ₹12,000 → sales ₹15,000 → ₹600/day) 📘 |
-| 7 | Agent | Sir, sirf 20%, aur woh bhi sirf extra sales pe. Aapka daily average abhi lagbhag 12,000 hai. Agar sales 15,000 ho gayi, toh extra 3,000 pe 20%, yaani 600 rupaye din ka. | |
+| 6 | Customer | Achha. **Isme kitna katega**? | Keyword hint "How much is cut" (20% of incremental: DRR ₹100 → sales ₹200 → ₹20/day) 📘 |
+| 7 | Agent | Sir, sirf 20%, aur woh bhi sirf extra sales pe. Aapka daily average abhi 200 rupaye hai. Agar sales 300 ho gayi, toh extra 100 pe 20%, yaani 20 rupaye din ka. | |
 | 8 | Customer | Aur **agar sales nahi badhi, toh bhi paisa katega kya? Koi risk** toh nahi? | Keyword hint "Worried about paying without growth" + grounded "zero deduction at or below the DRR" 📘 |
-| 9 | Agent | Bilkul nahi, sir. Agar sales 12,000 ya usse kam rahi, toh zero deduction. | Sentiment: patience/engagement up |
+| 9 | Agent | Bilkul nahi, sir. Agar sales 200 ya usse kam rahi, toh zero deduction. | Sentiment: patience/engagement up |
 | 10 | Customer | Hmm. Par **bees percent bahut zyada hai, das percent kar do**. **Mere dost ko kam mila** tha. | Keyword hint "Asks for a lower rate" (hold the 20%, non-negotiable) 📘 |
 | 11 | Agent | Sir, 20% sabke liye same hai, ise kam nahi kar sakte. Lekin yeh sirf extra sales pe hai; jo sales aap abhi karte ho, us pe kuch nahi lagta. | (No guardrail: a refusal is not a violation) |
 | 12 | Customer | Theek hai. **Kab katega**, aur **beech mein band karna ho** toh kar sakta hoon? | Keyword hint "When it's deducted" (weekly from payout) + grounded hint "stop anytime" 📘 |
@@ -31,13 +31,13 @@ specific section of the Tomato policy document from RAG
 
 ## Optional guardrail beat (adds ~10s)
 
-To show the red policy banner, replace line 11 with a deliberate slip, then correct it:
+To show a policy warning, replace line 11 with a deliberate slip, then correct it:
 
 > **Agent:** Theek hai sir, aapke liye **commission 15% kar deta hoon**… sorry sir, correction, 20% hi hai, sabke liye same.
 
-Expected: a **critical guardrail** fires on the partial transcript while the agent is still talking
-("No discounts: the 20% commission is non-negotiable" / "Max Grow is exactly 20%…"). The scorecard
-will also flag it, which shows QA catching a live mistake.
+Expected: an amber **policy warning** appears on the HUD while the agent is still talking ("Max Grow
+is exactly 20%, and only on sales above the DRR"). Live warnings are never shown as a red alarm. The
+scorecard notes it too (a slip corrected on the same call costs little).
 
 ## Before you rehearse
 

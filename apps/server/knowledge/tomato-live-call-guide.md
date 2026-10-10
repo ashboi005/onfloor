@@ -36,9 +36,9 @@ appears at the top.
 ## "How much will you cut?" / "Kitna katega?" / "What is the commission?" / "How much do you charge?"
 
 Approved answer: "Only 20%, and only on the extra sales above your current daily average, your DRR.
-Your existing sales are never charged." Worked example: DRR ₹14,200 a day. If daily sales rise to
-₹18,200, the incremental sales are ₹4,000, and 20% of that is ₹800 a day. The merchant keeps the
-other ₹3,200 of the extra sales. If sales don't grow above the DRR, nothing is deducted.
+Your existing sales are never charged." Worked example: DRR ₹100 a day. If daily sales rise to
+₹200, the incremental sales are ₹100, and 20% of that is ₹20 a day. The merchant keeps the other
+₹80 of the extra sales. If sales don't grow above the DRR, nothing is deducted.
 
 Never say: 15%, 30% or any rate other than 20%; that it is charged on total sales.
 

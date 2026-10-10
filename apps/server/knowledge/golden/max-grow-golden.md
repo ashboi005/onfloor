@@ -1,5 +1,5 @@
 Customer: "Agar sales nahi badhi toh bhi paisa katega kya?"
-Agent: "Bilkul nahi, sir. Aapka DRR abhi 14,200 hai. Agar aapki daily sales 14,200 ya usse kam rahi, toh zero deduction. Sirf usse upar ki sales pe 20% lagta hai."
+Agent: "Bilkul nahi, sir. Aapka DRR abhi 100 rupaye hai. Agar aapki daily sales 100 ya usse kam rahi, toh zero deduction. Sirf usse upar ki sales pe 20% lagta hai."
 Why it worked: Answered the risk question directly with the merchant's own DRR and the zero-deduction rule.
 ---
 Customer: "Twenty percent bahut hai, das percent karo."

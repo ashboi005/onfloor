@@ -36,8 +36,8 @@ import { playTimeline } from "./timeline";
  *
  *   const call = useSimCall(start);      // start = result of useStartSim().mutateAsync(...)
  *
- *   call.phase           "dialing" (show start.ticket in Nugget) → "ringing" → call.answer()
- *                        → "connected" → call.end() / customer hangs up → "wrap_up" → dispose → "done"
+ *   call.phase           "dialing" (show start.ticket in Nugget) → "ringing" (auto-answered after
+ *                        ~1.2s; call.answer() picks up at once) → "connected" → call.end() / customer hangs up → "wrap_up" → dispose → "done"
  *   call.turns, call.personaState, call.patience, call.micLevel, call.requests (what the customer asked for)
  *   turn.translation     English subtitle (render with `subtitleText(turn, mode)` from "@/lib/subtitles")
  *
@@ -261,6 +261,9 @@ function mockResult(start: SimSessionStart, s: SimCallState, action: WorkspaceAc
     }
   }
 }
+
+/** How long "ringing" shows before the call connects on its own. */
+const AUTO_ANSWER_MS = 1200;
 
 /** Partials shorter than this don't count as the agent interrupting (echo leaks start small). */
 const BARGE_IN_MIN_CHARS = 6;
@@ -612,6 +615,13 @@ export function useSimCall(start: SimSessionStart | null) {
     }
     send({ type: "answer" });
   }, [start, send, mockWrapUp]);
+
+  // The auto-dialled call connects by itself: ringing shows for a beat, then it's picked up.
+  useEffect(() => {
+    if (state.phase !== "ringing") return;
+    const t = setTimeout(answer, AUTO_ANSWER_MS);
+    return () => clearTimeout(t);
+  }, [state.phase, answer]);
 
   const workspace = useCallback(
     (action: WorkspaceAction) => {

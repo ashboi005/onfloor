@@ -97,7 +97,7 @@ export default function SimulatorPicker() {
               <button key={m.id} type="button" onClick={() => choose({ kind: "merchant", merchant: m })} aria-pressed={selected} className="text-left">
                 <Card className={`h-full transition ${selected ? "border-primary ring-1 ring-primary/50" : "hover:border-primary/40"}`}>
                   <CardHeader className="p-4">
-                    <div className="flex items-start justify-between gap-2"><CardTitle className="text-base">{m.restaurantName}</CardTitle>{m.demo && <span className="border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-primary">Demo</span>}</div>
+                    <CardTitle className="text-base">{m.restaurantName}</CardTitle>
                     <CardDescription>{m.ownerName} · {m.locality}, {m.city}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-1 p-4 pt-0 text-xs text-muted-foreground">

@@ -18,8 +18,8 @@ run against the real server.
    3. **Guidance on/off** + language → **Start simulation** (`useStartSim`).
 2. **Workspace** `/simulator/[callId]`
    - **Dialing:** Nugget pops the ticket (`start.ticket`: UID, merchant name, restaurant, top items + DRR).
-   - **Ringing** after a random 2–5s: a big "pick up" button → `call.answer()` (must be the click
-     handler: it unlocks audio). Mic/STT open only now.
+   - **Ringing** after a random 2–5s, shown for ~1.2s, then the call **connects by itself** (no
+     pick-up button; `call.answer()` exists to connect at once). Mic/STT open only now.
    - **Connected:** the customer answers first. Browser-style tabs: **Merchant Dashboard** (paste UID
      → full details to confirm) and **Ad Studio** (UID, email, campaign type, start/end date ≥ 1 month,
      launch). Under them the **Max Grow calculator** (drag expected sales → 20% of the extra).
@@ -60,7 +60,7 @@ call.dispositionRemainingMs
 call.guidance           // guidance on: { steps, next: { stepId, text, target }, tips (≤3, newest first) }
 call.suggestion         // guidance on: { outcome, template, callback, reason }, ~2–4s into wrap-up
 
-call.answer(); call.openTab(tab); call.lookup(uid); call.launchCampaign(draft);
+call.answer() /* optional: auto-answered */; call.openTab(tab); call.lookup(uid); call.launchCampaign(draft);
 call.sendEmail(template, callbackSlot?); call.dispose({ outcome, callback }); call.end(); call.setMuted(b);
 ```
 
@@ -79,11 +79,12 @@ renders and no suggestion arrives.
 
 ## Data you'll see (seeded, `bun run db:seed`)
 
-8 merchants (`fixtures/merchants.ts`), demo = **Sharma Ji Ke Chhole Bhature** (owner, curious, asks
-how to rank higher, gives a new email). Others cover a manager and a son answering (callback path),
+8 merchants (`fixtures/merchants.ts`), the one we present is **Sharma Ji Ke Chhole Bhature** (owner,
+friendly, DRR ₹100, asks how to rank higher and how much it costs, then agrees after the pitch; no
+"Demo" badge in the UI). DRRs are ₹100–800 so the maths stays simple (₹100 → ₹200 = ₹20). Others cover a manager and a son answering (callback path),
 a frustrated owner (empathy), a haggler (non-negotiable 20%), a not-sure owner (follow-up), a busy
 owner (likely no). 6 behaviour presets (`fixtures/personas.ts`). Each agent account has two past
-calls (88 A, and a 17 F with QA deductions) for the calls list and report card.
+calls (88 A, and a 31 F with QA deductions) for the calls list and report card.
 
 ## Design notes
 

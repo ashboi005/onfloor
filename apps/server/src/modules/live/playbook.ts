@@ -28,7 +28,7 @@ export const PLAYBOOK: Array<{ kind: HintKind; triggers: RegExp; title: string; 
     kind: "objection",
     triggers: /commission|kitna (?:katega|lagega)|how much (?:will you|do you) (?:cut|charge|take)|charges?\b|fees?\b|कितना (?:कटेगा|लगेगा)|कमीशन/i,
     title: "How much is cut",
-    body: "20% of incremental sales only. Example: DRR ₹12,000 → sales ₹15,000 → 20% of ₹3,000 = ₹600/day. Nothing if sales don't grow.",
+    body: "20% of incremental sales only. Example: DRR ₹100 → sales ₹200 → 20% of ₹100 = ₹20/day. Nothing if sales don't grow.",
   },
   {
     kind: "pitch",

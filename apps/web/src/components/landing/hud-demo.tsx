@@ -24,7 +24,7 @@ const SOURCE = "Tomato Live Call Guide";
 const SCRIPT: Frame[] = [
   { at: 400, line: { id: "l1", who: "agent", text: "Good morning sir, Ashwath from the Tomato team. Vikas Gupta ji, Gupta Sweets & Snacks?" }, mood: [62, 22, 48], talk: 70 },
   { at: 2200, line: { id: "l2", who: "customer", text: "Haan ji. Achha, isme kitna katega?", en: "Yes. So how much will be cut?" }, mood: [60, 28, 58], talk: 58 },
-  { at: 2900, hint: { id: "h1", kind: "pitch", title: "How much is cut", body: "20% only on sales above their DRR. ₹12,000 → ₹15,000 a day = ₹600/day.", source: SOURCE } },
+  { at: 2900, hint: { id: "h1", kind: "pitch", title: "How much is cut", body: "20% only on sales above their DRR. ₹100 → ₹200 a day = ₹20/day.", source: SOURCE } },
   { at: 4600, line: { id: "l3", who: "agent", text: "Sirf 20%, aur woh bhi sirf extra sales pe. Sales nahi badhi toh zero deduction." }, mood: [68, 20, 66], talk: 55 },
   { at: 6600, line: { id: "l4", who: "customer", text: "Bees bahut hai, das percent kar do. Mere dost ko kam mila.", en: "Twenty is too much, make it ten. My friend got less." }, mood: [52, 44, 61], talk: 50 },
   { at: 7300, hint: { id: "h2", kind: "objection", title: "Asks for a lower rate", body: "Hold the 20%: same for every partner, and only on sales they wouldn't have had otherwise.", source: SOURCE } },
@@ -91,7 +91,7 @@ export function HudDemo() {
 
       {/* Guardrail */}
       <div className={`overflow-hidden transition-all duration-300 ${s.guardrail ? "max-h-16 opacity-100" : "max-h-0 opacity-0"}`}>
-        <div className="flex items-center gap-2 bg-red-500/90 px-4 py-2 text-xs font-semibold text-white">
+        <div className="flex items-center gap-2 border-b border-amber-400/40 bg-amber-400/15 px-4 py-2 text-xs font-semibold text-amber-700 dark:text-amber-200">
           <ShieldAlert className="size-4 shrink-0" /> Max Grow is exactly 20%, and only on sales above the DRR. No discounts.
         </div>
       </div>

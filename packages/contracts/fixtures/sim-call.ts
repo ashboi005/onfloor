@@ -1,5 +1,4 @@
 import { GUIDANCE_STEPS, type GuidanceState, type GuidanceStepId, type GuidanceTip, type SimServerMessage, type Timed, type TranscriptTurn } from "../src";
-import { sharmaJi } from "./merchants";
 
 /**
  * A scripted ~2 min simulator call: Ashwath pitches Max Grow to Rajesh Sharma (Sharma Ji Ke
@@ -23,7 +22,6 @@ function turn(speaker: TranscriptTurn["speaker"], text: string, startMs: number,
   return { id: `turn_sim_${seq}`, callId: SIM_CALL_ID, seq, speaker, text, language: "hinglish", startMs, endMs };
 }
 
-const req = sharmaJi.requests[0]!;
 
 const t = {
   c0: turn("customer", "Hello? Haan ji, boliye.", 1200, 2600),
@@ -32,13 +30,13 @@ const t = {
   a2: turn("agent", "Thank you sir. Aap hi restaurant ke owner hain na, financial decisions aap hi lete hain?", 14500, 18500),
   c2: turn("customer", "Haan, dukaan meri hai. Sab main hi dekhta hoon.", 19500, 22500),
   a3: turn("agent", "Sir, ek baar details confirm kar leta hoon. Aapka registered email rajesh.sharma@sharmajichholebhature.in hai aur phone 98110 42271, sahi hai?", 26000, 33000),
-  c3: turn("customer", req.phrasing, 34000, 39500),
-  a4: turn("agent", "Noted sir, orders@sharmajichholebhature.in. Sir, hum aapke liye Max Grow plan laaye hain. Jab koi Tomato pe chhole bhature search karega, aapka restaurant sabse upar dikhega, top-selling list mein bhi.", 40500, 51000),
+  c3: turn("customer", "Haan ji, sab sahi hai.", 34000, 36000),
+  a4: turn("agent", "Thank you sir. Sir, hum aapke liye Max Grow plan laaye hain. Jab koi Tomato pe chhole bhature search karega, aapka restaurant sabse upar dikhega, top-selling list mein bhi.", 40500, 51000),
   c4: turn("customer", "Achha. Waise mera restaurant search mein neeche kyun aata hai? Naye wale upar dikhte hain.", 52000, 57000),
   a5: turn("agent", "Sir, visibility ke liye teen cheezein help karti hain: menu quality improve kijiye, items ki photos daaliye, abhi 42 mein se sirf 11 items pe photo hai, aur orders kam reject kijiye. Max Grow uske upar aapko top pe le aata hai.", 58000, 70000),
-  c5: turn("customer", "Theek hai. Par isme paisa kitna katega? Agar sales nahi badhi toh?", 71000, 75500),
-  a6: turn("agent", "Sir, sirf 20% lagta hai, aur woh bhi sirf extra sales pe. Aapka daily average abhi 14,200 hai. Agar sales 18,200 ho gayi, toh extra 4,000 pe 20%, yaani 800 rupaye per day. Agar sales 14,200 ya usse kam rahi, toh zero deduction. Weekly payout se adjust hota hai, aur aap kabhi bhi band kar sakte hain.", 76500, 93000),
-  c6: turn("customer", "Achha, toh koi risk nahi hai. Theek hai, laga do.", 94000, 98000),
+  c5: turn("customer", "Theek hai. Isme kitna katega?", 71000, 73500),
+  a6: turn("agent", "Sir, sirf 20% lagta hai, aur woh bhi sirf extra sales pe. Aapka daily average abhi 100 rupaye hai. Agar sales 200 ho gayi, toh extra 100 pe 20%, yaani 20 rupaye. Agar sales 100 ya usse kam rahi, toh zero deduction. Weekly payout se adjust hota hai, aur aap kabhi bhi band kar sakte hain.", 76500, 91000),
+  c6: turn("customer", "Achha, badhiya. Theek hai, laga do.", 92000, 95000),
   a7: turn("agent", "Done sir. Aapka Max Grow campaign aaj, October 10th se start ho raha hai aur November 10th tak chalega, ek mahine ke liye.", 112000, 119000),
   c7: turn("customer", "Theek hai, badhiya.", 120000, 121500),
   a8: turn("agent", "Thank you for selecting our plan. Is there anything else I can help you with today?", 122500, 127000),
@@ -53,13 +51,13 @@ export const simCallTranslations: Record<string, string> = {
   [t.a2.id]: "Thank you sir. You are the owner of the restaurant, and you take the financial decisions?",
   [t.c2.id]: "Yes, the shop is mine. I handle everything.",
   [t.a3.id]: "Sir, let me confirm your details once. Your registered email is rajesh.sharma@sharmajichholebhature.in and phone 98110 42271, correct?",
-  [t.c3.id]: "The phone is right, but that email is old. Send everything to orders@sharmajichholebhature.in now.",
-  [t.a4.id]: "Noted sir, orders@sharmajichholebhature.in. Sir, we have the Max Grow plan for you. When someone searches for chhole bhature on Tomato, your restaurant will show at the very top, and in the top-selling list too.",
+  [t.c3.id]: "Yes, it's all correct.",
+  [t.a4.id]: "Thank you sir. Sir, we have the Max Grow plan for you. When someone searches for chhole bhature on Tomato, your restaurant will show at the very top, and in the top-selling list too.",
   [t.c4.id]: "Okay. By the way, why does my restaurant come so low in search? The new places show up above me.",
   [t.a5.id]: "Sir, three things help visibility: improve the menu quality, add photos to your items, right now only 11 of 42 items have a photo, and reject fewer orders. Max Grow then takes you to the top on top of that.",
-  [t.c5.id]: "Fine. But how much money will be cut for this? What if sales don't go up?",
-  [t.a6.id]: "Sir, it's only 20%, and only on the extra sales. Your daily average right now is 14,200. If sales go to 18,200, it's 20% of the extra 4,000, so 800 rupees per day. If sales stay at 14,200 or below, there's zero deduction. It's adjusted from the weekly payout, and you can stop it whenever you want.",
-  [t.c6.id]: "Okay, so there's no risk. Fine, put it on.",
+  [t.c5.id]: "Okay. How much will be cut for this?",
+  [t.a6.id]: "Sir, it's only 20%, and only on the extra sales. Your daily average right now is 100 rupees. If sales go to 200, it's 20% of the extra 100, so 20 rupees. If sales stay at 100 or below, there's zero deduction. It's adjusted from the weekly payout, and you can stop it whenever you want.",
+  [t.c6.id]: "Okay, great. Fine, put it on.",
   [t.a7.id]: "Done sir. Your Max Grow campaign starts today, October 10th, and runs till November 10th, for one month.",
   [t.c7.id]: "Okay, great.",
   [t.a8.id]: "Thank you for selecting our plan. Is there anything else I can help you with today?",
@@ -121,12 +119,10 @@ export const simCallTimeline: Timed<SimServerMessage>[] = [
   timer(30000),
   ...say(t.a3),
   ...say(t.c3),
-  msg(39000, { type: "crm_request", request: req, atMs: 39000 }),
   guidance(
     40000,
     ["greeting", "verify_identity", "verify_owner", "lookup", "confirm_details"],
-    { stepId: "pitch", text: "Pitch Max Grow: top of search for the dishes they sell; 20% only on sales above ₹14,200/day.", target: "calculator" },
-    { kind: "info", text: "New email: orders@sharmajichholebhature.in. Use it in Ad Studio, not the one on the dashboard." },
+    { stepId: "pitch", text: "Pitch Max Grow: top of search for the dishes they sell; 20% only on sales above ₹100/day.", target: "calculator" },
   ),
   ...say(t.a4),
   timer(45000),
@@ -144,7 +140,7 @@ export const simCallTimeline: Timed<SimServerMessage>[] = [
     76000,
     ["greeting", "verify_identity", "verify_owner", "lookup", "confirm_details", "pitch"],
     { stepId: "campaign", text: "Explain the billing with his numbers.", target: "calculator" },
-    { kind: "answer", text: "20% only on sales above ₹14,200/day. At or below that: zero deduction. Billed weekly from the payout; he can stop anytime." },
+    { kind: "answer", text: "20% only on sales above ₹100/day: ₹100 → ₹200 is ₹20. At or below ₹100: zero deduction. Weekly from the payout; stop anytime." },
   ),
   timer(75000),
   ...say(t.a6),
@@ -153,7 +149,7 @@ export const simCallTimeline: Timed<SimServerMessage>[] = [
   guidance(
     98500,
     ["greeting", "verify_identity", "verify_owner", "lookup", "confirm_details", "pitch"],
-    { stepId: "campaign", text: "He said yes. Ad Studio: UID 21847390, orders@sharmajichholebhature.in, Max Grow, Oct 10 → Nov 10.", target: "tab.ad_studio" },
+    { stepId: "campaign", text: "He said yes. Ad Studio: UID 21847390, rajesh.sharma@sharmajichholebhature.in, Max Grow, Oct 10 → Nov 10.", target: "tab.ad_studio" },
   ),
   timer(105000),
   guidance(

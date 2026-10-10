@@ -7,7 +7,9 @@ const rupees = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
 /** Max Grow billing, live: drag the expected daily sales and read the commission off. */
 export function MaxGrowCalculator({ drr }: { drr: number }) {
-  const [sales, setSales] = useState(Math.round((drr * 1.25) / 100) * 100);
+  // Round steps that fit the DRR (₹10 for small DRRs), so the numbers stay easy to say.
+  const step = drr < 1000 ? 10 : 100;
+  const [sales, setSales] = useState(Math.round((drr * 2) / step) * step);
   const bill = maxGrowBill({ drr, avgDailySales: sales });
   return (
     <div data-guide="calculator" className="space-y-3 border border-border/70 bg-card/60 p-4 text-sm">
@@ -20,9 +22,9 @@ export function MaxGrowCalculator({ drr }: { drr: number }) {
         <input
           type="range"
           className="mt-2 w-full"
-          min={Math.round(drr * 0.7)}
-          max={Math.round(drr * 2)}
-          step={100}
+          min={Math.round((drr * 0.5) / step) * step}
+          max={drr * 3}
+          step={step}
           value={sales}
           onChange={(e) => setSales(Number(e.target.value))}
         />

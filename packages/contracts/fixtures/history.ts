@@ -65,7 +65,7 @@ const t = (i: number) => thaliCallTranscript[i]!;
 export const thaliScorecard: Scorecard = {
   callId: THALI_CALL_ID,
   kind: "sim",
-  overall: 17,
+  overall: 31,
   grade: "F",
   summary:
     "Offered a 15% commission to a haggling owner and told him something is deducted even when sales don't grow, both against Max Grow's terms. The opening had no greeting or name, the 2-month request was set up as one month, and the call was disposed late.",
@@ -101,7 +101,7 @@ export const thaliScorecard: Scorecard = {
       severity: "mistake",
       title: "Said there are minimum charges",
       detail: "If sales stay at or below the DRR there is zero deduction; the agent said the opposite.",
-      goldenLine: "Agar aapki sales ₹22,800 ya usse kam rahi, toh zero deduction, sir.",
+      goldenLine: "Agar aapki sales ₹500 ya usse kam rahi, toh zero deduction, sir.",
     },
     {
       id: "m_4",
@@ -123,10 +123,10 @@ export const thaliScorecard: Scorecard = {
     { requestId: "disposition_time", field: "Nugget · disposed within 90s", expected: "≤ 90s", actual: "118s", correct: false, latencyMs: 118000 },
   ],
   deductions: [
-    { code: "plan_misrepresented", label: "Plan terms misrepresented", points: 15, turnId: t(5).id, detail: "Offered a 15% commission and said there are minimum charges when sales don't grow." },
-    { code: "opening_line", label: "Opening skipped or incorrect", points: 5, turnId: t(1).id, detail: "No greeting, no name, no ownership check." },
-    { code: "closing_line", label: "Closing skipped or incorrect", points: 5, turnId: null, detail: "Never thanked him or asked if there was anything else." },
-    { code: "late_disposition", label: "Call not disposed in time", points: 10, turnId: null, detail: "Disposed after 118s (limit 90s)." },
+    { code: "plan_misrepresented", label: "Plan terms misrepresented", points: 10, turnId: t(5).id, detail: "Offered a 15% commission and said there are minimum charges when sales don't grow." },
+    { code: "opening_line", label: "Opening skipped", points: 3, turnId: t(1).id, detail: "Never gave his name or checked he was speaking to the owner." },
+    { code: "closing_line", label: "Closing skipped", points: 3, turnId: null, detail: "Ended with \"Ho gaya\": no thank-you or wrap-up." },
+    { code: "late_disposition", label: "Call not disposed in time", points: 5, turnId: null, detail: "Disposed after 118s (limit 90s)." },
   ],
   wrapUp: { outcome: "accepted", emailTemplate: "campaign_accepted", callback: null, secondsTaken: 118, withinLimit: false, customerDecision: "accepted" },
   stats: { durationMs: 67000, agentTalkPct: 44, interruptions: 0, deadAirCount: 2, longestMonologueMs: 6500, wpm: 124 },

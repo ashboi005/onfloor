@@ -59,11 +59,7 @@ export function Nugget({ start, call }: { start: SimSessionStart; call: SimCall 
       </div>
 
       {call.phase === "dialing" && <p className="flex items-center gap-2 text-xs text-muted-foreground"><PhoneCall className="size-3.5 animate-pulse" /> Auto-dialling the merchant…</p>}
-      {call.phase === "ringing" && (
-        <Button type="button" size="lg" className="animate-pulse bg-emerald-500 text-white hover:bg-emerald-600" onClick={call.answer}>
-          <PhoneIncoming className="size-4" /> Call connected · pick up
-        </Button>
-      )}
+      {call.phase === "ringing" && <p className="flex items-center gap-2 text-xs font-semibold text-emerald-400"><PhoneIncoming className="size-3.5 animate-pulse" /> Merchant picked up · connecting…</p>}
       {call.requests.length > 0 && call.phase !== "dialing" && (
         <div className="space-y-1 text-xs">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Customer asked</p>

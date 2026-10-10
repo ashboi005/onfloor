@@ -85,7 +85,7 @@ export const calls: Call[] = [
     startedAt: "2026-10-09T15:00:00.000Z",
     endedAt: "2026-10-09T15:01:07.000Z",
     durationMs: 67000,
-    overallScore: 17,
+    overallScore: 31,
   },
   {
     ...base,

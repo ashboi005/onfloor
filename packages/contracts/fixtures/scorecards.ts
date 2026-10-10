@@ -12,7 +12,7 @@ export const simScorecard: Scorecard = {
   overall: 88,
   grade: "A",
   summary:
-    "Clean opening, verified ownership and explained Max Grow with Rajesh's own numbers, including the no-deduction case; campaign launched with the corrected email. Soft skills cost him: one long billing monologue and a gap while setting up Ad Studio.",
+    "Clean opening, verified ownership and explained Max Grow with Rajesh's own numbers, including the no-deduction case; campaign launched with the details confirmed on the call. Soft skills cost him: one long billing monologue and a gap while setting up Ad Studio.",
   dimensions: [
     {
       key: "objectionHandling",
@@ -25,7 +25,7 @@ export const simScorecard: Scorecard = {
       key: "toolAccuracy",
       score: 100,
       weight: 0.25,
-      verdict: "9/9 checks correct: lookup, campaign (with the corrected email) and disposition, all in time.",
+      verdict: "9/9 checks correct: lookup, campaign and disposition, all in time.",
       evidence: [],
     },
     {
@@ -70,7 +70,7 @@ export const simScorecard: Scorecard = {
       title: "16-second billing monologue",
       detail: "All correct, but packed into one long turn; checking in halfway keeps the merchant engaged.",
       goldenLine:
-        "Sir, 20% sirf extra sales pe lagta hai. Jaise aapki sales ₹14,200 se ₹18,200 ho gayi, toh ₹800 per day. Samajh aa raha hai? Aur agar sales nahi badhi, toh kuch nahi katega.",
+        "Sir, 20% sirf extra sales pe lagta hai. Jaise aapki sales ₹100 se ₹200 ho gayi, toh ₹20. Samajh aa raha hai? Aur agar sales nahi badhi, toh kuch nahi katega.",
     },
     {
       id: "m_4",
@@ -85,7 +85,7 @@ export const simScorecard: Scorecard = {
   crmAudit: [
     { requestId: "lookup", field: "Merchant Dashboard · UID looked up", expected: "21847390", actual: "21847390", correct: true, latencyMs: 24500 },
     { requestId: "campaign_uid", field: "Ad Studio · UID", expected: "21847390", actual: "21847390", correct: true, latencyMs: null },
-    { requestId: "req_email", field: "Ad Studio · email (updated on the call)", expected: "orders@sharmajichholebhature.in", actual: "orders@sharmajichholebhature.in", correct: true, latencyMs: 68000 },
+    { requestId: "campaign_email", field: "Ad Studio · email", expected: "rajesh.sharma@sharmajichholebhature.in", actual: "rajesh.sharma@sharmajichholebhature.in", correct: true, latencyMs: null },
     { requestId: "campaign_type", field: "Ad Studio · campaign", expected: "max_grow", actual: "max_grow", correct: true, latencyMs: null },
     { requestId: "campaign_start", field: "Ad Studio · start date", expected: "2026-10-10", actual: "2026-10-10", correct: true, latencyMs: null },
     { requestId: "campaign_end", field: "Ad Studio · end date (min 1 month)", expected: "≥ 2026-11-10", actual: "2026-11-10", correct: true, latencyMs: null },

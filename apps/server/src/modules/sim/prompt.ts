@@ -43,7 +43,7 @@ const ARCHETYPE_BEHAVIOUR: Record<Archetype, string> = {
 
 /** How each archetype tends to end the call (the merchant's own situation can override it). */
 const DECISION_TENDENCY: Record<Archetype, string> = {
-  curious: "accepted, if the plan was explained correctly and your questions were answered; otherwise not_interested",
+  curious: "accepted once the rep has pitched the plan clearly (don't hold out for more); not_interested only if the rep got the plan badly wrong",
   skeptic: "accepted only if 'incremental' and the no-deduction case were explained convincingly; otherwise not_interested or rejected",
   price_squeezer: "accepted if the rep held the 20% firmly and showed the value; not_interested if they caved or dodged",
   impatient: "accepted if the pitch was crisp and to the point; rejected if the rep rambled or wasted your time",
@@ -137,7 +137,7 @@ ${m.background}
 
 ## What you know about your own business (answer honestly when asked; say it roughly, like a real owner would)
 - The email Tomato has on record: ${m.email}${emailUpdate ? ` (OUTDATED: your current email is ${resolveRequest(emailUpdate, callDate).email})` : " (correct)"}. Phone: ${m.phone} (correct). Address: ${m.address} (correct).
-- Sales are around ${rupees(Math.round(m.drr / 100) * 100)} a day. Best sellers: ${m.topItems.map((i) => i.name).join(", ")}.
+- Sales are around ${rupees(m.drr)} a day. Best sellers: ${m.topItems.map((i) => i.name).join(", ")}.
 - You don't know Tomato's internal stats about your listing unless the rep tells you.
 When you say an email address, say it the way people do on the phone, e.g. "orders at sharmajichholebhature dot in".
 
