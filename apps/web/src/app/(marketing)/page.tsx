@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { ArrowRight, PlayCircle, Bot, Zap, Activity, Repeat, Globe, Server, AudioLines, Sparkles, Send } from "lucide-react";
+import { ArrowRight, PlayCircle, Bot, Zap, Activity, Globe, Server, AudioLines, Send } from "lucide-react";
 import { CrowdCanvas } from "@/components/crowd-canvas";
 import TechText from "@/components/tech-text";
 import { ModeToggle } from "@/components/mode-toggle";
+import { HudDemo } from "@/components/landing/hud-demo";
+import { ReplayLoop } from "@/components/landing/replay-loop";
 
 export default function Landing() {
   return (
@@ -57,11 +59,8 @@ export default function Landing() {
               <PlayCircle className="mr-2 h-4 w-4" /> Watch the demo
             </button>
           </div>
-          {/* Placeholder for Product Visual */}
-          <div className="w-full max-w-5xl rounded-xl border bg-muted/50 p-4 shadow-2xl aspect-video flex items-center justify-center relative overflow-hidden backdrop-blur-md">
-            <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-transparent to-primary/5"></div>
-            <p className="text-muted-foreground font-medium relative z-10">[ Product Visual / Animated HUD Mock ]</p>
-          </div>
+          {/* Product visual: the live copilot HUD, self-playing */}
+          <HudDemo />
         </div>
       </section>
 
@@ -144,9 +143,8 @@ export default function Landing() {
                 ))}
               </ul>
             </div>
-            <div className="rounded-xl border bg-card p-8 shadow-sm flex items-center justify-center aspect-square md:aspect-auto md:h-96 relative">
-               <Repeat className="absolute h-32 w-32 text-muted-foreground/20 animate-[spin_10s_linear_infinite]" />
-               <p className="text-muted-foreground font-medium relative z-10">[ Replay Loop Diagram / Animation ]</p>
+            <div className="rounded-xl border bg-card p-6 shadow-sm sm:p-10">
+              <ReplayLoop />
             </div>
           </div>
         </div>
@@ -165,7 +163,7 @@ export default function Landing() {
             </p>
             <div className="flex flex-wrap gap-2">
               <span className="px-3 py-1 rounded-full bg-accent text-accent-foreground text-sm font-medium">English</span>
-              <span className="px-3 py-1 rounded-full bg-accent text-accent-foreground text-sm font-medium">Hindi (αñ╣αñ┐αñéαñªαÑÇ)</span>
+              <span className="px-3 py-1 rounded-full bg-accent text-accent-foreground text-sm font-medium">Hindi (हिंदी)</span>
               <span className="px-3 py-1 rounded-full bg-accent text-accent-foreground text-sm font-medium">Hinglish</span>
             </div>
           </div>
@@ -203,7 +201,7 @@ export default function Landing() {
       {/* 7. Footer */}
       <footer className="bg-background py-12 text-center text-muted-foreground">
         <div className="mx-auto max-w-6xl px-6">
-           <p className="mb-4">Built with Γ¥ñ∩╕Å in 24 hours at InnoHacks.</p>
+           <p className="mb-4">Built with ❤️ in 24 hours at InnoHacks.</p>
            <p className="text-sm">Team: Ashwath, Tushar, Harnoor, Mansukh</p>
         </div>
       </footer>
