@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Live HUD. OWNER: Harnoor. Spec: docs/specs/04-harnoor-frontend.md (Screen 3).
+ * Live call dashboard (HUD). OWNER: Tushar. Spec: docs/specs/03-tushar-live.md §7.
  * PLACEHOLDER: every field of `useLiveCall` rendered plainly. Build the real widgets in
  * components/hud/ (sentiment radar, hint stack, guardrail banner, talk metrics, mini transcript).
  */

@@ -122,7 +122,13 @@ falling back to the first customer line for `openingLine`) instead of failing th
 4. **Scoring ignored `pol_refund`.** Live calls are now scored against your `LIVE_POLICIES`, as your
    IMPLEMENTATION.md asked.
 
-## Questions for the team (decisions, not code)
+## Questions for the team: ✅ answered 2026-10-10
+
+Recorded as decisions in `03-tushar-live.md`: **Q1** policy-breaching demands are never CRM requests
+(they become objections/tactics); **Q2** AI hints as fast as possible, several on screen at once (no
+fixed deadline); **Q3** one agent per bridge is fine. The live dashboard UI is also now Tushar's.
+
+Original questions:
 
 - **Q1 · Are customer *demands* account changes?** The persona extracted "मुझे 20% discount चाहिए" as a
   CRM request `discountPct = 20`. Replayed in the simulator, the agent would then be scored *up* for
