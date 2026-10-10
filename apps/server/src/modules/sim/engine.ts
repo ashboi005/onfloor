@@ -23,6 +23,7 @@ import {
   callbackSlotSchema,
   renderEmail,
   resolveRequest,
+  spokenDate,
   startSimSchema,
   toMerchantDashboard,
   toMerchantSummary,
@@ -593,6 +594,7 @@ async function flushAgent(s: Session, extra?: string) {
   if (turn) {
     broadcast(s, { type: "turn", turn });
     onNewTurn(s, turn);
+    acknowledgeRequests(s, turn.text);
     s.history.push({ role: "user", content: turn.text });
     if (turn.endMs - turn.startMs > MONOLOGUE_MS) setPatience(s, s.patience - 10);
   } else if (extra) {
@@ -693,6 +695,27 @@ function currentEmail(s: Session): string {
   const update = [...s.requests.values()].find((r) => r.request.kind === "email_update" && r.status !== "not_asked");
   return update ? resolveRequest(update.request, s.callDate).email! : s.merchant.email;
 }
+
+/**
+ * The rep repeating an ask back ("noted, orders@…", "two months", "4 PM tomorrow") settles it in
+ * the persona's eyes, so it stops re-asking. The tools audit still checks what was actually set.
+ */
+function acknowledgeRequests(s: Session, said: string) {
+  const text = said.toLowerCase();
+  for (const r of s.requests.values()) {
+    if (r.status !== "pending") continue;
+    const v = resolveRequest(r.request, s.callDate);
+    const [, month = "", day = ""] = (v.date ? spokenDate(v.date) : "").toLowerCase().match(/^(\w+) (\d+)/) ?? [];
+    const hour = v.time ? String(Number(v.time.split(":")[0]) % 12 || 12) : "";
+    const ok =
+      r.request.kind === "email_update" ? text.includes(v.email!.split("@")[0]!)
+        : r.request.kind === "duration" ? new RegExp(`\\b(${v.months}|${MONTH_WORDS[v.months!] ?? "_"})\\s*(months?|mahine)`).test(text)
+          : r.request.kind === "start_date" ? (!!month && text.includes(month) && text.includes(day)) || /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(text)
+            : !!hour && new RegExp(`\\b${hour}\\b`).test(text);
+    if (ok) r.status = "done";
+  }
+}
+const MONTH_WORDS: Record<number, string> = { 1: "one", 2: "two", 3: "three", 4: "four", 6: "six", 12: "twelve" };
 
 /** A launched campaign settles the requests it reflects, so the persona stops asking. */
 function settleRequests(s: Session, c: Campaign) {
@@ -873,10 +896,17 @@ async function suggest(s: Session) {
       turns: await calls.transcript(s.callId),
       campaign: s.campaign,
       fallback: s.decision,
+      fallbackCallback: (() => {
+        const asked = [...s.requests.values()].find((r) => r.request.kind === "callback" && r.status !== "not_asked");
+        if (!asked) return null;
+        const v = resolveRequest(asked.request, s.callDate);
+        return { date: v.date!, time: v.time! };
+      })(),
     });
   }
   await new Promise((r) => setTimeout(r, Math.max(0, SUGGESTION_MIN_MS - (Date.now() - startedAt))));
   if (s.finished) return;
+  console.log(`[sim] ${s.callId}: disposition suggestion (${suggestion.outcome}) after ${Date.now() - startedAt}ms`);
   s.suggestion = suggestion;
   broadcast(s, { type: "disposition_suggestion", suggestion });
 }

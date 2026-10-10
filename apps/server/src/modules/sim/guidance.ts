@@ -210,23 +210,24 @@ export class Coach {
 
   private async review() {
     this.running = true;
-    try {
-      do {
-        this.dirty = false;
-        const turns = this.lastTurns;
-        if (!turns.length) break;
+    let failures = 0;
+    do {
+      this.dirty = false;
+      const turns = this.lastTurns;
+      if (!turns.length) break;
+      try {
+        const last = turns.at(-1)!;
         const lastCustomer = turns.filter((t) => t.speaker === "customer").at(-1)?.text ?? "";
-        const facts = lastCustomer ? formatSnippets(await groundingFacts(lastCustomer, 3), 1200) : "";
+        const facts = last.speaker === "customer" && lastCustomer ? formatSnippets(await groundingFacts(lastCustomer, 3), 1200) : "";
         const r = await services.llm.json({
           job: "copilot",
           schemaName: "sim_coach",
           schema: reviewSchema,
           temperature: 0.1,
           maxTokens: 400,
-          timeoutMs: 12_000,
+          timeoutMs: 8000,
           messages: [{ role: "user", content: this.prompt(turns, facts) }],
         });
-        if (this.ended) break;
         for (const id of r.done) if (this.status.get(id) === "todo") this.status.set(id, "done");
         // A step only counts once the tool step before it is done (e.g. confirm needs the lookup).
         if (this.status.get("lookup") !== "done" && this.status.get("confirm_details") === "done" && !this.nonOwner) {
@@ -234,14 +235,17 @@ export class Coach {
         }
         if (this.status.get("campaign") !== "done" && this.status.get("dictate_timeline") === "done") this.status.set("dictate_timeline", "todo");
         if (r.customerAgreed) this.agreed = true;
-        if (r.tip && !this.tips.some((t) => t.text === r.tip!.text)) this.tip(r.tip.kind, r.tip.text);
+        // Tips answer the customer's latest line; once the agent has spoken, it's too late for one.
+        if (r.tip && last.speaker === "customer" && !this.ended && !this.tips.some((t) => t.text === r.tip!.text)) this.tip(r.tip.kind, r.tip.text);
         this.publish();
-      } while (this.dirty && !this.ended);
-    } catch (err) {
-      console.error("[guidance] review failed", (err as Error).message);
-    } finally {
-      this.running = false;
-    }
+        failures = 0;
+      } catch (err) {
+        console.error("[guidance] review failed", (err as Error).message);
+        // One retry on a provider hiccup, so a single failure doesn't freeze the checklist.
+        if (++failures <= 1) this.dirty = true;
+      }
+    } while (this.dirty);
+    this.running = false;
   }
 
   private prompt(turns: TranscriptTurn[], facts: string): string {
@@ -273,7 +277,7 @@ Already done: ${done.join(", ") || "none"}.
 # Return
 - done: every script step the agent has completed so far (include the already-done ones).
 - customerAgreed: true once the customer has clearly agreed to go ahead with Max Grow.
-- tip: null unless the customer's LAST line asked a question or raised an objection that the agent hasn't answered yet (kind "answer" or "objection": what to say, from the facts above, max 25 words, use this merchant's numbers), or the agent's last line got a Max Grow fact wrong (kind "warning": the correct fact). Never repeat a tip already given: ${this.tips.map((t) => `"${t.text}"`).join(", ") || "none"}.
+- tip: null unless the transcript's LAST line is the CUSTOMER asking a question or raising an objection (kind "answer" or "objection": what the agent should say next, from the facts above, max 25 words, with this merchant's numbers). Use kind "warning" only if the agent's previous line got a Max Grow fact wrong (give the correct fact). Use the empathy lines only if the customer is actually complaining. No generic advice, no reminders of steps. Never repeat a tip already given: ${this.tips.map((t) => `"${t.text}"`).join(", ") || "none"}.
 
 # Transcript
 ${turns.slice(-14).map((t) => `${t.speaker.toUpperCase()}: ${t.text}`).join("\n")}`;
@@ -281,6 +285,8 @@ ${turns.slice(-14).map((t) => `${t.speaker.toUpperCase()}: ${t.text}`).join("\n"
 }
 
 // --- Disposition suggestion (after hang-up) -----------------------------------------------------
+
+const EMAIL_LABEL: Record<Disposition, string> = { accepted: "campaign acceptance", rejected: "rejection", not_interested: "follow-up", callback: "callback" };
 
 const suggestionSchema = z.object({
   outcome: z.enum(DISPOSITIONS),
@@ -295,11 +301,14 @@ export async function suggestDisposition(input: {
   callDate: string;
   turns: TranscriptTurn[];
   campaign: Campaign | null;
+  /** What the customer decided in the simulation, and the callback slot they asked for: used if the model is slow. */
   fallback: Disposition | null;
+  fallbackCallback?: { date: string; time: string } | null;
 }): Promise<DispositionSuggestion> {
   const fallback = (): DispositionSuggestion => {
     const outcome = input.fallback ?? (input.campaign ? "accepted" : "not_interested");
-    return { outcome, template: DISPOSITION_TEMPLATE[outcome], callback: null, reason: "Based on how the call ended." };
+    const callback = outcome === "callback" ? (input.fallbackCallback ?? null) : null;
+    return { outcome, template: DISPOSITION_TEMPLATE[outcome], callback, reason: `The customer's answer was "${outcome.replace("_", " ")}": send the ${EMAIL_LABEL[outcome]} email and dispose as ${outcome.replace("_", " ")}.` };
   };
   try {
     const r = await services.llm.json({
@@ -308,7 +317,8 @@ export async function suggestDisposition(input: {
       schema: suggestionSchema,
       temperature: 0.1,
       maxTokens: 300,
-      timeoutMs: 10_000,
+      // The suggestion is only useful in the first seconds of the 90s window.
+      timeoutMs: 4000,
       messages: [
         {
           role: "user",
@@ -316,7 +326,7 @@ export async function suggestDisposition(input: {
 Outcomes: accepted (agreed to Max Grow) | rejected (clear no) | not_interested (not interested or not sure, wants details / to think) | callback (asked to be called later, or the person wasn't the decision maker).
 Campaign launched in Ad Studio: ${input.campaign ? `yes, ${input.campaign.startDate} to ${input.campaign.endDate}` : "no"}.
 For callback: callbackDate (YYYY-MM-DD) and callbackTime (HH:MM, 24h) from what was agreed; if no time was agreed, pick the next working day at 11:00. Otherwise null.
-reason: one sentence for the agent, naming the email template to send.
+reason: one sentence for the agent, naming the email template to send (accepted → campaign acceptance, rejected → rejection, not_interested → follow-up, callback → callback).
 
 ${input.turns.slice(-16).map((t) => `${t.speaker.toUpperCase()}: ${t.text}`).join("\n")}`,
         },

@@ -209,7 +209,7 @@ export function turnNote(n: TurnNoteInput): string {
         ? `${r.request.id}: not asked yet`
         : r.status === "done"
           ? `${r.request.id}: DONE by the rep (do not ask again)`
-          : `${r.request.id}: asked ${r.askedSecAgo ?? 0}s ago, not confirmed yet`,
+          : `${r.request.id}: asked ${r.askedSecAgo ?? 0}s ago, the rep hasn't confirmed it (remind them only if they start closing the call without confirming)`,
     )
     .join("; ");
   return `[call note, not spoken: patience ${Math.round(n.patience)}/100; ${n.elapsedSec}s into the call; your asks: ${req || "none"}; ${
