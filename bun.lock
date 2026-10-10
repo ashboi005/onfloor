@@ -49,6 +49,7 @@
         "@varlock/nextjs-integration": "1.2.2",
         "babel-plugin-react-compiler": "^1.0.0",
         "better-auth": "catalog:",
+        "gsap": "^3.15.0",
         "lucide-react": "catalog:",
         "next": "^16.3.4",
         "next-themes": "catalog:",
