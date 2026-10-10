@@ -26,8 +26,6 @@
     "react-dom": "catalog:",
     "sonner": "catalog:",
     "varlock": "catalog:",
-    "@onfloor/contracts": "workspace:*",
-    "@tanstack/react-query": "^5.90.0",
     "zod": "catalog:"
   },
   "devDependencies": {
