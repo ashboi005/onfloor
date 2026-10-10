@@ -31,3 +31,11 @@ Still future on top of it:
 | Gemini | Gemini Live API (native audio in/out) for lower-latency copilot and simulator turns |
 | Analytics | Long-term agent performance dashboards, cohort comparison, manager alerts |
 | Platform | Multi-tenant orgs, SSO, role-based access for QA auditors, call-recording consent flows |
+
+## Custom client (simulator)
+
+Let the agent fill in their own client before starting a simulation (restaurant, owner, DRR, top
+items, who answers, their questions), instead of picking a seeded merchant. Built as a merchant with
+`source: "custom"` (the enum, the `merchants` table and the cast logic in `modules/sim/engine.ts`
+already support it); the picker would POST it and start with its id. No behaviour presets needed:
+the agent still picks/tunes the persona in step 2.

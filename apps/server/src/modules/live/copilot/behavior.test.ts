@@ -10,8 +10,13 @@ test("guardrails distinguish a promise from refusal, quotes, and approval reques
   expect(detectViolations("I need manager approval for a 15% discount")).toEqual([]);
   expect(detectViolations("I guarantee more orders").find((p) => p.id === "pol_guarantee")?.severity).toBe("warn");
   expect(detectViolations("I guarantee a full refund").map((p) => p.id)).toContain("pol_refund");
-  expect(detectViolations("Kal tak activation ho jayega").map((p) => p.id)).toContain("pol_activation");
-  expect(detectViolations("कल तक activate कर देंगे").map((p) => p.id)).toContain("pol_activation");
+  // [added by Ashwath] Tomato: any rate other than 20%, or on total sales, misrepresents Max Grow;
+  // the correct 20% on incremental sales is never a "discount".
+  expect(detectViolations("It's only 15% commission on your sales").map((p) => p.id)).toContain("pol_commission");
+  expect(detectViolations("Sir, 30 percent katega bas").map((p) => p.id)).toContain("pol_commission");
+  expect(detectViolations("We charge 20% on your total sales").map((p) => p.id)).toContain("pol_commission");
+  expect(detectViolations("We offer Max Grow at 20% commission only on the extra sales")).toEqual([]);
+  expect(detectViolations("It's not 15%, it's 20% commission on incremental sales")).toEqual([]);
   expect(detectViolations("15 प्रतिशत डिस्काउंट देंगे").map((p) => p.id)).toContain("pol_discount");
   expect(detectViolations("१५% छूट देंगे").map((p) => p.id)).toContain("pol_discount");
   expect(detectViolations("ऑर्डर की गारंटी देंगे").map((p) => p.id)).toContain("pol_guarantee");

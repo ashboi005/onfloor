@@ -1,5 +1,8 @@
 # Spec: Brand, Design System, Landing, Reports & Article (Mansukh)
 
+> **Update 2026-10-10:** you now also own the look of the simulator screens (picker, workspace, scorecard additions): see [08-tomato-sim-flow.md](08-tomato-sim-flow.md). The scorecard gained `deductions` and `wrapUp`.
+
+
 You set how OnFloor looks and reads. That covers the visual system everyone else builds
 with, the landing page judges see first, the scorecard screens that close the demo, and the
 written story (the article).

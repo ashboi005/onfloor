@@ -1,5 +1,8 @@
 # Spec: Live "Shadow AI" Copilot Backend (Tushar)
 
+> **Update 2026-10-10 (Ashwath):** the live demo is a Tomato Max Grow call too. `modules/live/policies.ts` now uses the Max Grow rules (+ a `pol_commission` fast path; `pol_activation` removed), `playbook.ts` has Max Grow keyword hints (Latin + Devanagari), and a grounded RAG hint may now follow a keyword hint. RAG doc: `apps/server/knowledge/tomato-live-call-guide.md`; rehearsal script: `docs/demo/02-live-call-script.md`. Persona `crmRequests` are Tomato asks now (`email_update | start_date | duration | callback`), see `persona-validation.ts`. All edits are marked `[added/updated by Ashwath]`.
+
+
 You own Pillar 2 on the backend: getting call audio out of Telegram, turning it into a
 speaker-labelled transcript, running the copilot brain that drives the HUD, storing the call,
 and **extracting a persona** that Pillar 1 can replay. The dashboard UI itself is Harnoor's (§7).

@@ -1,5 +1,8 @@
 # Spec: Simulator Workspace & Live Dashboard (Harnoor)
 
+> **Update 2026-10-10:** the simulator is now the Tomato / Max Grow flow (Nugget, Merchant Dashboard, Ad Studio, disposition). The old Mock CRM is gone; the new screens are specified in [08-tomato-sim-flow.md](08-tomato-sim-flow.md) and Mansukh owns their look. Your subtitle toggles are merged (English is now the default) and the HUD hint stack now shows several hints at once (done by Ashwath).
+
+
 You build the two **real-time screens**: the Flight Simulator (picker + Mock CRM + call terminal) and
 the Live call dashboard (HUD). Each gets its data from one hook (`useSimCall`, `useLiveCall`, written
 by Ashwath), and both run on **mock timelines**, so you never need the backend running until
