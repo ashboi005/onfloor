@@ -2,14 +2,18 @@
 name = "onfloor-telegram-bridge"
 version = "0.1.0"
 description = "Telegram private-call bridge for OnFloor (py-tgcalls). Owner: Tushar."
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
-  "py-tgcalls>=3.0.0",
+  "py-tgcalls==3.0.0",
   "pyrogram>=2.0.106",
-  "tgcrypto>=1.2.5",
   "sounddevice>=0.5",
   "numpy>=1.26",
   "scipy>=1.11",
-  "websockets>=13",
+  "websockets>=15",
   "python-dotenv>=1.0",
 ]
+
+# Pyrogram works without this accelerator. Python 3.12 builds require a C compiler
+# on platforms without a wheel; keep the base bridge install portable.
+[project.optional-dependencies]
+acceleration = ["tgcrypto>=1.2.5"]
