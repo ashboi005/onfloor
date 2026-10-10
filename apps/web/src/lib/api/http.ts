@@ -53,6 +53,7 @@ export const httpClient: ApiClient = {
   },
   startSim: (input) => request(simSessionStartSchema, "/api/sim/sessions", post(input)),
   endSim: (callId) => request(endSimResponseSchema, `/api/sim/sessions/${callId}/end`, post()),
+  simSttUrl: (callId) => request(z.object({ url: z.string() }), `/api/sim/sessions/${callId}/stt`, post()),
   replayCall: (callId) => request(simSessionStartSchema, `/api/calls/${callId}/replay`, post()),
   activeLiveCall: () => request(callSchema.nullable(), "/api/live/active"),
   simulateLiveCall: () => request(z.object({ callId: z.string() }), "/api/live/dev/simulate", post()),

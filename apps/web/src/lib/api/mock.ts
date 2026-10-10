@@ -104,6 +104,7 @@ export const mockClient: ApiClient = {
     store.scoringUntil.set(callId, Date.now() + SCORING_MS);
     return delay({ callId, status: "scoring" });
   },
+  simSttUrl: () => delay({ url: "" }),
   async replayCall(callId) {
     const source = findCall(callId);
     if (!source.personaId) {

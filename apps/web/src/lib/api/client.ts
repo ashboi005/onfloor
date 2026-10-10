@@ -29,6 +29,8 @@ export interface ApiClient {
   scorecard(callId: string): Promise<Scorecard | null>;
   startSim(input: StartSim): Promise<SimSessionStart>;
   endSim(callId: string): Promise<EndSimResponse>;
+  /** A fresh single-use ElevenLabs realtime STT URL ("" when voice isn't configured / mock). */
+  simSttUrl(callId: string): Promise<{ url: string }>;
   /** Start a sim session that replays a live call's extracted persona. */
   replayCall(callId: string): Promise<SimSessionStart>;
   activeLiveCall(): Promise<Call | null>;
