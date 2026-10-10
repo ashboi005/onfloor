@@ -63,3 +63,6 @@ temp
 __pycache__/
 .venv/
 apps/telegram-bridge/recordings/
+
+# Local storage / scratch (recordings, TTS samples)
+.data/
