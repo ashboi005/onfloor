@@ -175,8 +175,18 @@ call is live), `POST /api/live/calls/replay-file`, `WS /internal/live/ingest`.
 Rules (same as every frontend owner): **no `fetch`/`WebSocket` in UI code.** The page talks only to
 `useLiveCall("active" | callId)` from `@/hooks/use-live-call` (owner: Ashwath; ask for anything it
 doesn't expose). Types come from `@onfloor/contracts`; UI primitives come from `packages/ui` (Mansukh).
-The page currently has a plain placeholder at `apps/web/src/app/(app)/live/page.tsx` wired to every
-field; rebuild it in `components/hud/`. `NEXT_PUBLIC_USE_MOCKS=true` replays `fixtures/live-call.ts`,
+**You're not starting from scratch.** Harnoor already built the dashboard before the hand-over (merged on
+`main`). Take it over and finish it:
+
+| File | Component | State |
+|---|---|---|
+| `app/(app)/live/page.tsx` | the dashboard page, `useLiveCall("active")`, dev "Simulate a call" | ✅ built |
+| `components/hud/customer-memory.tsx` | `CustomerMemory`: "Last time…" card | ✅ built |
+| `components/hud/hint-stack.tsx` | `HintStack`: primary hint + source chips (📘) | 🟡 older hints are **collapsed** behind a toggle. Decision 1 wants several hints **visible** at once, each with its own countdown |
+| `components/hud/guardrail-banner.tsx` | `GuardrailBanner` | ✅ built |
+| `components/hud/sentiment-radar.tsx` | `SentimentRadar` + `recommendation()` | ✅ built (it will only move once the copilot LLM path works: review C1) |
+| `components/hud/talk-metrics.tsx` | `TalkMetrics` | ✅ built (alerts depend on review C3/C4) |
+| `components/hud/mini-transcript.tsx` | `MiniTranscript` | 🟡 add the **Original \| English** subtitle toggle (below) | `NEXT_PUBLIC_USE_MOCKS=true` replays `fixtures/live-call.ts`,
 so you can build it without a running call.
 
 The agent keeps this open on a second monitor (or half the screen) while on the Telegram
