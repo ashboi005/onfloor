@@ -72,7 +72,7 @@ End with `{"type":"call_ended","reason":"telegram_hangup"}`. The server replies 
 
 ## Fallback and rehearsal
 
-Upload each backup pair as `agentAudio`/`customerAudio` to authenticated `POST /api/live/calls/replay-file`, or combine them into stereo left=agent/right=customer using an audio editor preserving 16 kHz PCM16. The same real server pipeline generates STT, copilot, recordings and wrap-up events. See the live module README and `apps/server/demo-audio/README.md`.
+Upload each backup pair as `agentAudio`/`customerAudio` to authenticated `POST /api/live/calls/replay-file`, or combine them into stereo left=agent/right=customer using an audio editor preserving 16 kHz PCM16. Include optional multipart `customerId` (the same stable test identity for repeat replays) and `customerName` to exercise customer memory and label the persona. The same real server pipeline generates STT, copilot, recordings and wrap-up events. See the live module README and `apps/server/demo-audio/README.md`.
 
 Rehearse three complete runs including the fallback before freeze. Verify both speakers, interruption and reconnect, local backup playback, server gap logs, hint latency, persisted finals/events, recording URLs, scorecard and persona quotations/linkage. Real scoring and simulator/TTS must also be ready in Ashwath's modules.
 

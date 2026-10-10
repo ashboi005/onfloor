@@ -2,7 +2,7 @@ import { AppError } from "../../core/errors";
 import { CHUNK_SAMPLES, decodeWav, MAX_UPLOAD_BYTES } from "./audio";
 import { finishLiveCall, getActiveLiveCall, pushLiveAudio, startLiveCall } from "./session";
 
-export interface ReplayAudio { agent: Uint8Array; customer: Uint8Array; samples: number }
+export interface ReplayAudio { agent: Uint8Array; customer: Uint8Array; samples: number; customerId?: string; customerName?: string }
 
 /** Read with a hard bound even when Content-Length is missing/chunked. */
 export async function readReplayUpload(request: Request): Promise<ReplayAudio> {
@@ -30,25 +30,32 @@ export async function readReplayUpload(request: Request): Promise<ReplayAudio> {
 }
 
 export async function parseReplayFiles(form: { keys(): Iterable<string>; get(name: string): unknown; getAll(name: string): unknown[] }): Promise<ReplayAudio> {
-  const fields = ["audio", "agentAudio", "customerAudio"];
+  const fields = ["audio", "agentAudio", "customerAudio", "customerId", "customerName"];
   if ([...form.keys()].some((key) => !fields.includes(key)) || fields.some((key) => form.getAll(key).length > 1)) throw new AppError("BAD_REQUEST", { message: "Unexpected or duplicate audio fields." });
+  const metadata: Pick<ReplayAudio, "customerId" | "customerName"> = {};
+  for (const [field, key] of [["customerId", "customerId"], ["customerName", "customerName"]] as const) {
+    const value = form.get(field);
+    if (value == null) continue;
+    if (typeof value !== "string" || !value.trim() || value.trim().length > 200) throw new AppError("BAD_REQUEST", { message: `${field} must be 1–200 characters.` });
+    metadata[key] = value.trim();
+  }
   const audio = form.get("audio"), agent = form.get("agentAudio"), customer = form.get("customerAudio");
   if (audio instanceof File && !agent && !customer) {
     const decoded = decodeWav(new Uint8Array(await audio.arrayBuffer()));
     if (decoded.channels.length !== 2) throw new AppError("BAD_REQUEST", { message: "audio must be stereo: left agent, right customer." });
-    return { agent: decoded.channels[0]!, customer: decoded.channels[1]!, samples: decoded.samples };
+    return { agent: decoded.channels[0]!, customer: decoded.channels[1]!, samples: decoded.samples, ...metadata };
   }
   if (!audio && agent instanceof File && customer instanceof File) {
     if (agent.size + customer.size > MAX_UPLOAD_BYTES) throw new AppError("BAD_REQUEST", { message: "Upload exceeds 64 MiB." });
     const a = decodeWav(new Uint8Array(await agent.arrayBuffer())), c = decodeWav(new Uint8Array(await customer.arrayBuffer()));
     if (a.channels.length !== 1 || c.channels.length !== 1 || a.samples !== c.samples) throw new AppError("BAD_REQUEST", { message: "Both files must be mono with equal duration." });
-    return { agent: a.channels[0]!, customer: c.channels[0]!, samples: a.samples };
+    return { agent: a.channels[0]!, customer: c.channels[0]!, samples: a.samples, ...metadata };
   }
   throw new AppError("BAD_REQUEST", { message: "Use audio, or agentAudio plus customerAudio." });
 }
 
 export async function startReplay(agentId: string, audio: ReplayAudio): Promise<{ callId: string }> {
-  const call = await startLiveCall({ agentId, customerLabel: "Recorded demo call" });
+  const call = await startLiveCall({ agentId, customerLabel: audio.customerName ?? "Recorded demo call", externalCustomerId: audio.customerId });
   void (async () => {
     const start = performance.now();
     for (let offset = 0; offset < audio.samples; offset += CHUNK_SAMPLES) {

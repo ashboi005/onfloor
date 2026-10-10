@@ -1,7 +1,11 @@
 import { createPersonaSchema, crmStateSchema, type CreatePersona, type CrmRequest } from "@onfloor/contracts";
+import { detectViolations } from "./policies";
 
 /** Conservative extraction: ambiguous changes are omitted, never guessed. */
 function supportsValue(request: CrmRequest): boolean {
+  // The simulator must never reward an agent for granting an unlawful demand.
+  if (request.field === "discountPct" && Number(request.value) > 10) return false;
+  if (detectViolations(request.phrasing).length) return false;
   const text = request.phrasing.toLowerCase().replace(/_/g, " ");
   if (request.field === "weekendNotifications") {
     if (!/weekend|notification|alert|सप्ताहांत|नोटिफिकेशन/.test(text)) return false;
@@ -49,4 +53,20 @@ export function validatePersonaEvidence(draft: CreatePersona, customerLines: str
     ids.add(request.id);
   }
   return { ...persona, crmRequests: persona.crmRequests.filter(supportsValue) };
+}
+
+/** Keep sound evidence when the model fails to repair only some quotations. */
+export function salvagePersonaEvidence(draft: CreatePersona, customerLines: string[]): CreatePersona {
+  const openingLine = customerLines.includes(draft.openingLine) ? draft.openingLine : customerLines[0];
+  if (!openingLine) throw new Error("No customer speech is available.");
+  const catchphrases = draft.speechStyle.catchphrases.filter((phrase) =>
+    phrase.trim() && customerLines.some((line) => line.includes(phrase)));
+  const seen = new Set<string>();
+  const crmRequests = draft.crmRequests.filter((request) => {
+    if (seen.has(request.id) || !crmStateSchema.shape[request.field].safeParse(request.value).success ||
+      !customerLines.some((line) => line.includes(request.phrasing)) || !supportsValue(request)) return false;
+    seen.add(request.id);
+    return true;
+  });
+  return createPersonaSchema.parse({ ...draft, openingLine, speechStyle: { ...draft.speechStyle, catchphrases }, crmRequests });
 }
