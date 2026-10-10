@@ -1,24 +1,27 @@
-import type { Call, Scorecard, SimSessionStart } from "@onfloor/contracts";
+import type { Call, MerchantSummary, Scorecard, SimSessionStart, StartSim } from "@onfloor/contracts";
+import { todayIst, toMerchantSummary, toNuggetTicket } from "@onfloor/contracts";
 import {
   calls as fixtureCalls,
   currentAgent,
-  liveScorecard,
-  personas,
-  scenarios,
-  simScorecard,
-  transcripts,
-  simCallTranscript,
-  LIVE_CALL_ID,
-  liveCall,
   knowledgeSnippets,
   knowledgeSources,
+  LIVE_CALL_ID,
+  liveCall,
+  liveScorecard,
+  merchants,
+  personas,
+  scenarios,
+  scorecards,
+  simCallTranscript,
+  simScorecard,
+  transcripts,
 } from "@onfloor/contracts/fixtures";
 import { type ApiClient, ApiClientError } from "./client";
 
 /**
  * In-memory API over the fixtures. Behaves like the server where it matters for UI:
- * latency, 404 for unknown ids, a ~3s "scoring" window after a sim call ends, and
- * new calls showing up in the list.
+ * latency, 404 for unknown ids, a ~3s "scoring" window after a sim call is disposed, and
+ * new calls showing up in the list. Workspace actions are answered by `useSimCall` (mock mode).
  */
 const LATENCY_MS = 300;
 const SCORING_MS = 3000;
@@ -41,29 +44,51 @@ function findCall(id: string): Call {
   return call;
 }
 
-function startSession(scenarioId: string, personaId: string | undefined, language: SimSessionStart["persona"]["language"], replayOfCallId?: string): SimSessionStart {
-  const scenario = scenarios.find((s) => s.id === scenarioId);
+/** Same cast rules as the server: a live-call persona brings its own identity. */
+function startSession(input: StartSim): SimSessionStart {
+  const scenario = input.scenarioId ? scenarios.find((s) => s.id === input.scenarioId) : scenarios[0];
   if (!scenario) throw notFound("scenario");
-  const persona = personas.find((p) => p.id === (personaId ?? scenario.defaultPersonaId));
-  if (!persona) throw notFound("persona");
+  const picked = input.personaId ? personas.find((p) => p.id === input.personaId) : undefined;
+  if (input.personaId && !picked) throw notFound("persona");
+  const merchant =
+    merchants.find((m) => m.id === input.merchantId) ??
+    (picked?.source === "live_call" ? undefined : merchants.find((m) => m.id === scenario.defaultMerchantId));
+  // Mock: a live-call persona replays against the demo merchant's tools, under the persona's own name.
+  const base = merchant ?? merchants[0]!;
+  const persona = picked ?? personas.find((p) => p.id === base.defaultPersonaId)!;
+  const summary: MerchantSummary = merchant
+    ? toMerchantSummary(merchant)
+    : { ...toMerchantSummary(base), id: `mer_live_${persona.id}`, ownerName: persona.name, source: "live_call", sourcePersonaId: persona.id, answeredBy: "owner" };
   const callId = `call_mock_${Math.random().toString(36).slice(2, 10)}`;
   store.calls.unshift({
     id: callId,
     kind: "sim",
     status: "active",
     agentId: currentAgent.id,
-    scenarioId,
+    scenarioId: scenario.id,
     personaId: persona.id,
-    replayOfCallId: replayOfCallId ?? null,
-    language,
-    customerLabel: persona.name,
+    merchantId: summary.id,
+    guidance: input.guidance ?? true,
+    replayOfCallId: input.replayOfCallId ?? null,
+    language: input.language,
+    customerLabel: `${merchant ? merchant.answerer.name : persona.name} · ${summary.restaurantName}`,
     startedAt: new Date().toISOString(),
     endedAt: null,
     durationMs: null,
     recordingUrl: null,
     overallScore: null,
   });
-  return { callId, scenario, persona, sttUrl: "" };
+  return {
+    callId,
+    scenario,
+    persona,
+    merchant: summary,
+    ticket: { ...toNuggetTicket(base), merchantName: summary.ownerName },
+    agentName: currentAgent.name,
+    guidance: input.guidance ?? true,
+    callDate: todayIst(),
+    sttUrl: "",
+  };
 }
 
 export const mockClient: ApiClient = {
@@ -80,6 +105,7 @@ export const mockClient: ApiClient = {
     personas.unshift(persona);
     return delay(persona);
   },
+  merchants: (source) => delay(merchants.filter((m) => !source || m.source === source).map(toMerchantSummary)),
   calls: (kind) => delay(kind ? store.calls.filter((c) => c.kind === kind) : store.calls),
   async call(id) {
     const call = findCall(id);
@@ -90,26 +116,31 @@ export const mockClient: ApiClient = {
   async scorecard(callId) {
     const call = findCall(callId);
     const until = store.scoringUntil.get(callId);
-    if (call.status === "active" || (until && Date.now() < until) || call.status === "abandoned" || call.status === "failed") {
+    if (call.status === "active" || call.status === "wrap_up" || (until && Date.now() < until) || call.status === "abandoned" || call.status === "failed") {
       return delay(null);
     }
     if (until) {
       call.status = "scored";
       call.overallScore = call.kind === "sim" ? simScorecard.overall : liveScorecard.overall;
     }
-    const base: Scorecard = call.kind === "sim" ? simScorecard : liveScorecard;
+    const base: Scorecard = scorecards.find((s) => s.callId === callId) ?? (call.kind === "sim" ? simScorecard : liveScorecard);
     return delay({ ...base, callId });
   },
-  async startSim({ scenarioId, personaId, language, replayOfCallId }) {
-    return delay(startSession(scenarioId, personaId, language, replayOfCallId));
+  async startSim(input) {
+    return delay(startSession(input));
   },
   async endSim(callId) {
     const call = findCall(callId);
-    call.status = "scoring";
-    call.endedAt = new Date().toISOString();
-    call.durationMs = Date.now() - new Date(call.startedAt).getTime();
-    store.scoringUntil.set(callId, Date.now() + SCORING_MS);
-    return delay({ callId, status: "scoring" });
+    if (call.status === "active") {
+      call.status = "wrap_up";
+      call.endedAt = new Date().toISOString();
+      call.durationMs = Date.now() - new Date(call.startedAt).getTime();
+    } else if (call.status === "wrap_up") {
+      // Disposed (useSimCall calls this again in mock mode): score it.
+      call.status = "scoring";
+      store.scoringUntil.set(callId, Date.now() + SCORING_MS);
+    }
+    return delay({ callId, status: call.status });
   },
   simSttUrl: () => delay({ url: "" }),
   async replayCall(callId) {
@@ -118,7 +149,7 @@ export const mockClient: ApiClient = {
       throw new ApiClientError(400, { code: "BAD_REQUEST", message: "No persona extracted yet.", retryable: false });
     }
     const persona = personas.find((p) => p.id === source.personaId)!;
-    return delay(startSession(scenarios[0]!.id, persona.id, persona.language, callId));
+    return delay(startSession({ personaId: persona.id, language: persona.language, guidance: true, replayOfCallId: callId }));
   },
   activeLiveCall: () => delay(liveCall),
   simulateLiveCall: () => delay({ callId: LIVE_CALL_ID }),

@@ -2,16 +2,27 @@
 
 import type {
   ApiError,
-  CrmAction,
+  Campaign,
+  CampaignDraft,
+  CallbackSlot,
   CrmRequest,
+  DispositionInput,
+  DispositionSuggestion,
+  EmailTemplateId,
+  GuidanceState,
+  MerchantDashboard,
   PersonaState,
   SimClientMessage,
+  SimPhase,
   SimServerMessage,
   SimSessionStart,
   TranscriptTurn,
+  WorkspaceAction,
+  WorkspaceResult,
+  WorkspaceTab,
 } from "@onfloor/contracts";
-import { simServerMessageSchema } from "@onfloor/contracts";
-import { simCallTimeline } from "@onfloor/contracts/fixtures";
+import { renderEmail, simServerMessageSchema, toMerchantDashboard, validateCampaign } from "@onfloor/contracts";
+import { merchants, simCallTimeline, simRingTimeline, simWrapUpTimeline } from "@onfloor/contracts/fixtures";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { api } from "@/lib/api";
 import { isEcho } from "@/lib/audio/echo";
@@ -22,24 +33,38 @@ import { playTimeline } from "./timeline";
 /**
  * useSimCall: the ONLY thing the simulator UI talks to (owner: Ashwath).
  *
- *   const call = useSimCall(start);   // start = result of useStartSim().mutateAsync(...)
- *   call.turns, call.personaState, call.patience, call.pendingCrmRequests, call.micLevel, ...
- *   turn.translation: English subtitle, arrives a bit after the turn for Hindi/Hinglish
- *   (render with `subtitleText(turn, mode)` from "@/lib/subtitles")
- *   call.reportCrmAction({ field, from, to });
- *   const { callId } = await call.end();
+ *   const call = useSimCall(start);      // start = result of useStartSim().mutateAsync(...)
  *
- * Mock mode replays fixtures/sim-call.ts with fake audio levels.
- * Real mode: /ws/sim/:callId for the call, the mic streamed to ElevenLabs realtime STT
- * (single-use URL from the server), persona audio fetched and played with a live level
- * meter, barge-in when the agent talks over the persona, echo rejection for the
- * persona's own voice leaking back into the mic.
+ *   call.phase           "dialing" (show start.ticket in Nugget) → "ringing" → call.answer()
+ *                        → "connected" → call.end() / customer hangs up → "wrap_up" → dispose → "done"
+ *   call.turns, call.personaState, call.patience, call.micLevel, call.requests (what the customer asked for)
+ *   turn.translation     English subtitle (render with `subtitleText(turn, mode)` from "@/lib/subtitles")
+ *
+ *   Tools (each answered by a result in state, never thrown):
+ *   call.openTab("merchant_dashboard" | "ad_studio")
+ *   call.lookup(uid)                → call.dashboard = { uid, merchant | null }
+ *   call.launchCampaign(draft)      → call.campaign, or call.launchError ("Minimum campaign duration is 1 month.")
+ *   call.sendEmail(template, slot?) → call.email (wrap-up only)
+ *   call.dispose({ outcome, callback }) → phase "done", then navigate to /calls/:callId
+ *   call.dispositionRemainingMs     wrap-up countdown (90s)
+ *
+ *   Guidance on (start.guidance): call.guidance = { steps, next: { text, target }, tips },
+ *   call.suggestion = the AI's disposition suggestion, ~2-3s into wrap-up.
+ *
+ * Mock mode replays fixtures/sim-call.ts (ring → conversation after answer → wrap-up) and answers
+ * the tools locally with the same pure functions the server uses.
+ * Real mode: /ws/sim/:callId for the call, the mic streamed to ElevenLabs realtime STT once the
+ * call is connected (single-use URL from the server), persona audio fetched and played with a live
+ * level meter, barge-in when the agent talks over the persona, echo rejection for the persona's
+ * own voice leaking back into the mic.
  */
 
 export type SimCallStatus = "connecting" | "live" | "ending" | "ended" | "error";
 export type MicStatus = "idle" | "connecting" | "listening" | "denied" | "error";
 
 export interface SimCallState {
+  phase: SimPhase;
+  /** Connection/conversation status (kept for the terminal): live = connected and talking. */
   status: SimCallStatus;
   mic: MicStatus;
   turns: TranscriptTurn[];
@@ -50,17 +75,30 @@ export interface SimCallState {
   patience: number;
   elapsedMs: number;
   remainingMs: number;
-  /** Requests the persona has voiced that the agent hasn't actioned in the CRM yet. */
-  pendingCrmRequests: (CrmRequest & { atMs: number })[];
-  endReason: "agent" | "persona_hung_up" | "time" | null;
+  /** What the customer asked for during the call (new email, start date, duration, callback), oldest first. */
+  requests: (CrmRequest & { atMs: number })[];
+  endReason: "agent" | "persona_hung_up" | "time" | "missed" | null;
   /** 0–1, for visualisers. */
   micLevel: number;
   personaLevel: number;
   muted: boolean;
   error: ApiError | null;
+  // --- Tools ---
+  /** Last Merchant Dashboard lookup. merchant = null: no merchant with that UID. */
+  dashboard: { uid: string; merchant: MerchantDashboard | null } | null;
+  campaign: Campaign | null;
+  launchError: string | null;
+  email: { to: string; subject: string; body: string } | null;
+  /** Email / dispose refusals (e.g. "Pick the callback date and time first."). */
+  wrapUpError: string | null;
+  dispositionRemainingMs: number | null;
+  // --- Guidance ---
+  guidance: GuidanceState | null;
+  suggestion: DispositionSuggestion | null;
 }
 
 const initial = (start: SimSessionStart | null): SimCallState => ({
+  phase: "dialing",
   status: "connecting",
   mic: "idle",
   turns: [],
@@ -68,18 +106,25 @@ const initial = (start: SimSessionStart | null): SimCallState => ({
   personaState: "idle",
   patience: start ? start.persona.traits.patience * 10 : 50,
   elapsedMs: 0,
-  remainingMs: (start?.scenario.hardLimitSec ?? 480) * 1000,
-  pendingCrmRequests: [],
+  remainingMs: (start?.scenario.hardLimitSec ?? 600) * 1000,
+  requests: [],
   endReason: null,
   micLevel: 0,
   personaLevel: 0,
   muted: false,
   error: null,
+  dashboard: null,
+  campaign: null,
+  launchError: null,
+  email: null,
+  wrapUpError: null,
+  dispositionRemainingMs: null,
+  guidance: null,
+  suggestion: null,
 });
 
 type Action =
   | { type: "server"; msg: SimServerMessage }
-  | { type: "crm_done"; field: CrmAction["field"] }
   | { type: "levels"; mic: number; persona: number }
   | { type: "muted"; muted: boolean }
   | { type: "status"; status: SimCallStatus }
@@ -88,6 +133,21 @@ type Action =
   | { type: "persona_state"; state: PersonaState }
   | { type: "local_error"; error: ApiError }
   | { type: "reset"; start: SimSessionStart | null };
+
+function applyResult(s: SimCallState, r: WorkspaceResult): SimCallState {
+  switch (r.kind) {
+    case "tab_opened":
+      return s;
+    case "dashboard_lookup":
+      return { ...s, dashboard: { uid: r.uid, merchant: r.merchant } };
+    case "campaign_launch":
+      return r.ok ? { ...s, campaign: r.campaign, launchError: null } : { ...s, launchError: r.error };
+    case "email_sent":
+      return r.ok ? { ...s, email: r.email, wrapUpError: null } : { ...s, wrapUpError: r.error };
+    case "dispose":
+      return r.ok ? { ...s, wrapUpError: null } : { ...s, wrapUpError: r.error };
+  }
+}
 
 function reducer(s: SimCallState, a: Action): SimCallState {
   switch (a.type) {
@@ -107,22 +167,23 @@ function reducer(s: SimCallState, a: Action): SimCallState {
       return { ...s, personaState: a.state };
     case "local_error":
       return { ...s, error: a.error };
-    case "crm_done":
-      return { ...s, pendingCrmRequests: s.pendingCrmRequests.filter((r) => r.field !== a.field) };
     case "server": {
       const m = a.msg;
       switch (m.type) {
+        case "phase":
+          return {
+            ...s,
+            phase: m.phase,
+            status: m.phase === "connected" ? "live" : m.phase === "wrap_up" || m.phase === "done" ? "ended" : s.status,
+            dispositionRemainingMs: m.phase === "wrap_up" ? m.remainingMs : m.phase === "done" ? 0 : s.dispositionRemainingMs,
+          };
         case "state":
-          return { ...s, status: m.status === "active" ? "live" : s.status, elapsedMs: m.elapsedMs };
+          return { ...s, elapsedMs: m.elapsedMs };
         case "turn": {
           // Keep a subtitle that raced ahead of a re-sent turn (reconnect catch-up).
           const prev = s.turns.find((t) => t.id === m.turn.id);
           const turn = prev?.translation && !m.turn.translation ? { ...m.turn, translation: prev.translation } : m.turn;
-          return {
-            ...s,
-            status: s.status === "connecting" ? "live" : s.status,
-            turns: [...s.turns.filter((t) => t.id !== m.turn.id), turn].sort((x, y) => x.seq - y.seq),
-          };
+          return { ...s, turns: [...s.turns.filter((t) => t.id !== m.turn.id), turn].sort((x, y) => x.seq - y.seq) };
         }
         case "turn_translation":
           return { ...s, turns: s.turns.map((t) => (t.id === m.turnId ? { ...t, translation: m.translation } : t)) };
@@ -133,7 +194,13 @@ function reducer(s: SimCallState, a: Action): SimCallState {
         case "timer":
           return { ...s, elapsedMs: m.elapsedMs, remainingMs: m.remainingMs };
         case "crm_request":
-          return { ...s, pendingCrmRequests: [...s.pendingCrmRequests, { ...m.request, atMs: m.atMs }] };
+          return s.requests.some((r) => r.id === m.request.id) ? s : { ...s, requests: [...s.requests, { ...m.request, atMs: m.atMs }] };
+        case "workspace_result":
+          return applyResult(s, m.result);
+        case "guidance":
+          return { ...s, guidance: m.guidance };
+        case "disposition_suggestion":
+          return { ...s, suggestion: m.suggestion };
         case "ended":
           return { ...s, status: "ended", endReason: m.reason, personaState: "idle" };
         case "error":
@@ -145,6 +212,49 @@ function reducer(s: SimCallState, a: Action): SimCallState {
         case "persona_audio":
           return s; // played by the effect below
       }
+    }
+  }
+}
+
+/** Mock mode: what the server would answer to a workspace action. */
+function mockResult(start: SimSessionStart, s: SimCallState, action: WorkspaceAction, atMs: number): WorkspaceResult {
+  const byUid = (uid: string) => merchants.find((m) => m.uid === uid.trim()) ?? null;
+  switch (action.kind) {
+    case "tab_opened":
+      return { kind: "tab_opened", ok: true };
+    case "dashboard_lookup": {
+      const m = byUid(action.uid);
+      return { kind: "dashboard_lookup", ok: !!m, uid: action.uid, merchant: m ? toMerchantDashboard(m) : null };
+    }
+    case "campaign_launch": {
+      const target = byUid(action.campaign.uid);
+      const error = validateCampaign(action.campaign, { today: start.callDate, uidExists: !!target });
+      if (error || !target) return { kind: "campaign_launch", ok: false, error: error ?? "No merchant found.", campaign: null };
+      return {
+        kind: "campaign_launch",
+        ok: true,
+        error: null,
+        campaign: { ...action.campaign, id: `cmp_mock_${atMs}`, restaurantName: target.restaurantName, status: action.campaign.startDate === start.callDate ? "live" : "scheduled", launchedAtMs: atMs },
+      };
+    }
+    case "email_sent": {
+      if (s.phase !== "wrap_up") return { kind: "email_sent", ok: false, error: "Send the email from Nugget after the call ends.", email: null };
+      const m = byUid(start.ticket.uid);
+      const email = renderEmail(action.template, {
+        ownerName: start.ticket.merchantName,
+        restaurantName: start.ticket.restaurantName,
+        uid: start.ticket.uid,
+        drr: start.ticket.drr,
+        agentName: start.agentName,
+        campaign: s.campaign,
+        callback: action.callback,
+      });
+      return { kind: "email_sent", ok: true, error: null, email: { to: s.campaign?.email ?? m?.email ?? "", ...email } };
+    }
+    case "dispose": {
+      if (s.phase !== "wrap_up") return { kind: "dispose", ok: false, error: "You can dispose the call once it has ended." };
+      if (action.disposition.outcome === "callback" && !action.disposition.callback) return { kind: "dispose", ok: false, error: "Pick the callback date and time first." };
+      return { kind: "dispose", ok: true, error: null };
     }
   }
 }
@@ -176,11 +286,17 @@ function rms(analyser: AnalyserNode, buf: Float32Array<ArrayBuffer>): number {
 export function useSimCall(start: SimSessionStart | null) {
   const [state, dispatch] = useReducer(reducer, start, initial);
   const wsRef = useRef<WebSocket | null>(null);
+  /** Epoch ms of the call clock's zero (set when the call connects). */
   const startedAtRef = useRef(0);
-  const endedRef = useRef(false);
+  const phaseRef = useRef<SimPhase>("dialing");
+  const stateRef = useRef(state);
   const personaStateRef = useRef<PersonaState>("idle");
   const mutedRef = useRef(false);
+  const mockRef = useRef<{ cancel: () => void; wrapTimer?: ReturnType<typeof setInterval> }>({ cancel: () => {} });
   personaStateRef.current = state.personaState;
+  phaseRef.current = state.phase;
+  stateRef.current = state;
+  const connected = state.phase === "connected";
 
   // Real-mode audio plumbing.
   const ctxRef = useRef<AudioContext | null>(null);
@@ -196,7 +312,7 @@ export function useSimCall(start: SimSessionStart | null) {
   const send = useCallback((msg: SimClientMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(msg));
   }, []);
-  const callMs = () => Math.max(0, Date.now() - startedAtRef.current);
+  const callMs = () => (startedAtRef.current ? Math.max(0, Date.now() - startedAtRef.current) : 0);
 
   const stopPersonaAudio = useCallback(() => {
     const playing = playingRef.current;
@@ -208,29 +324,41 @@ export function useSimCall(start: SimSessionStart | null) {
     } catch {}
   }, []);
 
+  /** Mock: the server's wrap-up (90s countdown, suggestion, timer-out → scored). */
+  const mockWrapUp = useCallback(() => {
+    if (!start) return;
+    const ends = Date.now() + start.scenario.dispositionSec * 1000;
+    const tick = () => {
+      const remainingMs = Math.max(0, ends - Date.now());
+      dispatch({ type: "server", msg: { type: "phase", phase: "wrap_up", remainingMs } });
+      if (remainingMs === 0) {
+        clearInterval(mockRef.current.wrapTimer);
+        dispatch({ type: "server", msg: { type: "phase", phase: "done", remainingMs: null } });
+        void api.endSim(start.callId);
+      }
+    };
+    tick();
+    mockRef.current.wrapTimer = setInterval(tick, 1000);
+    if (start.guidance) {
+      const cancel = playTimeline(simWrapUpTimeline, (msg) => dispatch({ type: "server", msg }));
+      const prev = mockRef.current.cancel;
+      mockRef.current.cancel = () => (prev(), cancel());
+    }
+  }, [start]);
+
   // --- Call socket (or mock timeline) ---------------------------------------------
   useEffect(() => {
     dispatch({ type: "reset", start });
-    endedRef.current = false;
     committedRef.current = "";
+    startedAtRef.current = 0;
     if (!start) return;
-    startedAtRef.current = Date.now();
-    const onMsg = (msg: SimServerMessage) => {
-      if (msg.type === "ended") endedRef.current = true;
-      dispatch({ type: "server", msg });
-    };
 
     if (USE_MOCKS) {
-      dispatch({ type: "status", status: "live" });
-      return playTimeline(
-        simCallTimeline,
-        (msg) => {
-          // The real server ends + scores the call itself on hang-up; the mock API needs telling.
-          if (msg.type === "ended") void api.endSim(start.callId);
-          onMsg(msg);
-        },
-        600,
-      );
+      mockRef.current.cancel = playTimeline(simRingTimeline, (msg) => dispatch({ type: "server", msg }));
+      return () => {
+        mockRef.current.cancel();
+        clearInterval(mockRef.current.wrapTimer);
+      };
     }
 
     let closed = false;
@@ -245,10 +373,10 @@ export function useSimCall(start: SimSessionStart | null) {
         attempts = 0;
       };
       ws.onclose = () => {
-        // Reconnect while the call is live; the server replays the transcript on attach.
-        if (closed || endedRef.current) return;
+        // Reconnect until the call is done; the server replays phase, transcript and tools on attach.
+        if (closed || phaseRef.current === "done") return;
         if (attempts++ >= 5) {
-          onMsg({ type: "error", code: "WS_CLOSED", message: "Lost connection to the call.", retryable: false });
+          dispatch({ type: "server", msg: { type: "error", code: "WS_CLOSED", message: "Lost connection to the call.", retryable: false } });
           return;
         }
         retry = setTimeout(connect, Math.min(4000, 500 * 2 ** attempts));
@@ -257,6 +385,8 @@ export function useSimCall(start: SimSessionStart | null) {
         const parsed = simServerMessageSchema.safeParse(JSON.parse(String(e.data)));
         if (!parsed.success) return;
         const msg = parsed.data;
+        if (msg.type === "phase" && msg.phase === "connected" && !startedAtRef.current) startedAtRef.current = Date.now();
+        if (msg.type === "state" && msg.status === "active" && startedAtRef.current) startedAtRef.current = Date.now() - msg.elapsedMs;
         if (msg.type === "turn" && msg.turn.speaker === "agent") {
           // The server committed what we sent; drop it from the pending text.
           committedRef.current = "";
@@ -265,7 +395,7 @@ export function useSimCall(start: SimSessionStart | null) {
         if (msg.type === "turn" && msg.turn.speaker === "customer") lastPersonaTextRef.current = msg.turn.text;
         if (msg.type === "persona_audio") void playPersona(msg.turnId, msg.audioUrl);
         if (msg.type === "ended") stopPersonaAudio();
-        onMsg(msg);
+        dispatch({ type: "server", msg });
       };
     };
     connect();
@@ -308,7 +438,8 @@ export function useSimCall(start: SimSessionStart | null) {
 
   // --- Microphone → ElevenLabs realtime STT (real mode) ------------------------------
   useEffect(() => {
-    if (!start || USE_MOCKS) return;
+    // The mic and STT open once the agent picks up, and close at hang-up.
+    if (!start || USE_MOCKS || !connected) return;
     let cancelled = false;
     let stt: WebSocket | null = null;
     let node: AudioWorkletNode | null = null;
@@ -378,7 +509,7 @@ export function useSimCall(start: SimSessionStart | null) {
         };
         stt.onclose = () => {
           // Tokens are single-use: reconnect with a fresh URL while the call is live.
-          if (!cancelled && !endedRef.current) setTimeout(() => void connect(false), 800);
+          if (!cancelled && phaseRef.current === "connected") setTimeout(() => void connect(false), 800);
         };
 
         if (!node) {
@@ -432,7 +563,7 @@ export function useSimCall(start: SimSessionStart | null) {
       ctxRef.current = null;
       void ctx.close().catch(() => {});
     };
-  }, [start, send, stopPersonaAudio]);
+  }, [start, connected, send, stopPersonaAudio]);
 
   // --- Levels (real analysers, or fake ones in mock mode) ----------------------------
   useEffect(() => {
@@ -455,32 +586,81 @@ export function useSimCall(start: SimSessionStart | null) {
     return () => clearInterval(id);
   }, [start]);
 
-  const reportCrmAction = useCallback(
-    (action: Omit<CrmAction, "atMs">) => {
-      send({ type: "crm_action", action: { ...action, atMs: callMs() } });
-      dispatch({ type: "crm_done", field: action.field });
+  // --- Actions ------------------------------------------------------------------------
+
+  /** Pick up the ringing call. Call it from the click handler (it unlocks audio). */
+  const answer = useCallback(() => {
+    if (!start || (phaseRef.current !== "ringing" && phaseRef.current !== "dialing")) return;
+    if (USE_MOCKS) {
+      mockRef.current.cancel();
+      startedAtRef.current = Date.now();
+      const timeline = simCallTimeline.filter((m) => start.guidance || m.event.type !== "guidance");
+      mockRef.current.cancel = playTimeline(timeline, (msg) => {
+        dispatch({ type: "server", msg });
+        if (msg.type === "phase" && msg.phase === "wrap_up") mockWrapUp();
+      });
+      return;
+    }
+    send({ type: "answer" });
+  }, [start, send, mockWrapUp]);
+
+  const workspace = useCallback(
+    (action: WorkspaceAction) => {
+      if (!start) return;
+      if (USE_MOCKS) {
+        const result = mockResult(start, stateRef.current, action, callMs());
+        setTimeout(() => {
+          dispatch({ type: "server", msg: { type: "workspace_result", result } });
+          if (result.kind === "dispose" && result.ok) {
+            mockRef.current.cancel();
+            clearInterval(mockRef.current.wrapTimer);
+            dispatch({ type: "server", msg: { type: "phase", phase: "done", remainingMs: null } });
+            void api.endSim(start.callId);
+          }
+        }, 150);
+        return;
+      }
+      send({ type: "workspace", action });
     },
-    [send],
+    [start, send],
   );
 
+  const openTab = useCallback((tab: WorkspaceTab) => workspace({ kind: "tab_opened", tab }), [workspace]);
+  const lookup = useCallback((uid: string) => workspace({ kind: "dashboard_lookup", uid }), [workspace]);
+  const launchCampaign = useCallback((campaign: CampaignDraft) => workspace({ kind: "campaign_launch", campaign }), [workspace]);
+  const sendEmail = useCallback(
+    (template: EmailTemplateId, callback: CallbackSlot | null = null) => workspace({ kind: "email_sent", template, callback }),
+    [workspace],
+  );
+  /** Closes the call; phase becomes "done" and it's scored. Navigate to /calls/:callId then. */
+  const dispose = useCallback((disposition: DispositionInput) => workspace({ kind: "dispose", disposition }), [workspace]);
+
+  /** Hang up. A connected call moves to wrap-up (dispose next); a call not picked up is abandoned. */
   const end = useCallback(async () => {
     if (!start) throw new Error("No call in progress");
-    if (endedRef.current) return { callId: start.callId };
-    endedRef.current = true;
-    dispatch({ type: "status", status: "ending" });
+    if (phaseRef.current === "wrap_up" || phaseRef.current === "done") return { callId: start.callId };
     stopPersonaAudio();
+    if (USE_MOCKS) {
+      const wasConnected = phaseRef.current === "connected";
+      mockRef.current.cancel();
+      dispatch({ type: "server", msg: { type: "ended", reason: wasConnected ? "agent" : "missed", callId: start.callId } });
+      if (wasConnected) mockWrapUp();
+      else dispatch({ type: "server", msg: { type: "phase", phase: "done", remainingMs: null } });
+      await api.endSim(start.callId);
+      return { callId: start.callId };
+    }
+    dispatch({ type: "status", status: "ending" });
     send({ type: "end" });
     const res = await api.endSim(start.callId);
-    dispatch({ type: "status", status: "ended" });
     return { callId: res.callId };
-  }, [send, start, stopPersonaAudio]);
+  }, [send, start, stopPersonaAudio, mockWrapUp]);
 
   const setMuted = useCallback((muted: boolean) => {
     mutedRef.current = muted;
     dispatch({ type: "muted", muted });
   }, []);
 
-  return { ...state, reportCrmAction, end, setMuted };
+  return { ...state, answer, openTab, lookup, launchCampaign, sendEmail, dispose, end, setMuted };
 }
 
 export type SimCall = ReturnType<typeof useSimCall>;

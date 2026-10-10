@@ -1,6 +1,6 @@
 "use client";
 
-import type { CallKind, CreateKnowledgeDoc, CreatePersona, KnowledgeScopeKind, PersonaSource, StartSim } from "@onfloor/contracts";
+import type { CallKind, CreateKnowledgeDoc, CreatePersona, KnowledgeScopeKind, MerchantSource, PersonaSource, StartSim } from "@onfloor/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./instance";
 
@@ -13,6 +13,7 @@ export const queryKeys = {
   scenarios: ["scenarios"] as const,
   personas: (source?: PersonaSource) => ["personas", source ?? "all"] as const,
   persona: (id: string) => ["persona", id] as const,
+  merchants: (source?: MerchantSource) => ["merchants", source ?? "all"] as const,
   calls: (kind?: CallKind) => ["calls", kind ?? "all"] as const,
   call: (id: string) => ["call", id] as const,
   scorecard: (id: string) => ["scorecard", id] as const,
@@ -25,6 +26,9 @@ export const usePersonas = (source?: PersonaSource) =>
   useQuery({ queryKey: queryKeys.personas(source), queryFn: () => api.personas(source) });
 export const usePersona = (id: string | undefined) =>
   useQuery({ queryKey: queryKeys.persona(id ?? ""), queryFn: () => api.persona(id!), enabled: !!id });
+/** Picker cards: who's on the other end (seed merchants; live_call ones are derived on replay). */
+export const useMerchants = (source?: MerchantSource) =>
+  useQuery({ queryKey: queryKeys.merchants(source), queryFn: () => api.merchants(source) });
 export const useCalls = (kind?: CallKind) =>
   useQuery({ queryKey: queryKeys.calls(kind), queryFn: () => api.calls(kind) });
 export const useCall = (id: string | undefined) =>

@@ -10,6 +10,8 @@ import type {
   CallKind,
   CallWithTranscript,
   EndSimResponse,
+  MerchantSource,
+  MerchantSummary,
   Persona,
   PersonaSource,
   Scenario,
@@ -30,11 +32,14 @@ export interface ApiClient {
   persona(id: string): Promise<Persona>;
   /** "Save as custom persona": stored with source "custom" whatever you send. */
   createPersona(persona: CreatePersona): Promise<Persona>;
+  /** Tomato merchant profiles for the picker (no dashboard data; that's found in the tools on the call). */
+  merchants(source?: MerchantSource): Promise<MerchantSummary[]>;
   calls(kind?: CallKind): Promise<Call[]>;
   call(id: string): Promise<CallWithTranscript>;
   /** null while the call is still being scored. */
   scorecard(callId: string): Promise<Scorecard | null>;
   startSim(input: StartSim): Promise<SimSessionStart>;
+  /** Hang up. A connected call goes to wrap-up (status "wrap_up"): dispose in Nugget via useSimCall, then it's scored. */
   endSim(callId: string): Promise<EndSimResponse>;
   /** A fresh single-use ElevenLabs realtime STT URL ("" when voice isn't configured / mock). */
   simSttUrl(callId: string): Promise<{ url: string }>;

@@ -7,6 +7,7 @@ import {
   knowledgeSnippetSchema,
   knowledgeSourceSchema,
   knowledgeStatusSchema,
+  merchantSummarySchema,
   personaSchema,
   scenarioSchema,
   scorecardSchema,
@@ -45,6 +46,7 @@ export const httpClient: ApiClient = {
   personas: (source) => request(z.array(personaSchema), `/api/personas${qs({ source })}`),
   persona: (id) => request(personaSchema, `/api/personas/${id}`),
   createPersona: (persona) => request(personaSchema, "/api/personas", post(persona)),
+  merchants: (source) => request(z.array(merchantSummarySchema), `/api/merchants${qs({ source })}`),
   calls: (kind) => request(z.array(callSchema), `/api/calls${qs({ kind })}`),
   call: (id) => request(callWithTranscriptSchema, `/api/calls/${id}`),
   // 202 { status } while scoring → null (the hook keeps polling).
