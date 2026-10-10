@@ -3,6 +3,7 @@ import { LIVE_CALL_ID, liveCallTimeline, suresh } from "@onfloor/contracts/fixtu
 import { calls } from "../../core/calls";
 import { replayTimeline, swapId } from "../../core/timeline";
 import { ENV } from "../../env.server";
+import { customerMemoryEvent } from "../knowledge";
 import { createPersona } from "../personas";
 import { scoreCall } from "../scoring";
 import { endCopilot } from "./copilot";
@@ -29,6 +30,8 @@ export async function startLiveCall(input: {
   });
   hub.begin(call.id);
   hub.emit(call.id, { type: "call_started", call });
+  // RAG: what we remember about this caller from earlier calls (empty for a first call).
+  void customerMemoryEvent(input.externalCustomerId ?? null, call.customerLabel).then((e) => hub.emit(call.id, e));
   return call;
 }
 
@@ -64,7 +67,8 @@ export async function finishLiveCall(callId: string) {
  * it came from Telegram. Lets the HUD integrate before the bridge exists.
  */
 export async function simulateFixtureCall(agentId: string) {
-  const call = await startLiveCall({ agentId, customerLabel: "Suresh Patil", language: "hinglish" });
+  // A stable customer key, so a second simulated call from "Suresh" recalls the first (RAG).
+  const call = await startLiveCall({ agentId, customerLabel: "Suresh Patil", language: "hinglish", externalCustomerId: "demo-suresh" });
   const passthrough = new Set<LiveEvent["type"]>([
     "transcript_partial",
     "hint",

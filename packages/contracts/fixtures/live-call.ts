@@ -4,7 +4,7 @@ import type { Call, LiveEvent, Timed, TranscriptTurn } from "../src";
  * A scripted ~2 min live Telegram call. This is the REFERENCE stream for Pillar 2:
  * - Harnoor builds the HUD against it (mock `useLiveCall`).
  * - Tushar's real `/ws/live` output should look like it.
- * Includes partials, hints, a critical guardrail, sentiment swings, a dead-air alert,
+ * Includes customer memory (RAG), partials, cited hints, a critical guardrail, sentiment swings, a dead-air alert,
  * and ends with scorecard_ready + persona_ready.
  */
 export const LIVE_CALL_ID = "call_live_demo";
@@ -62,6 +62,22 @@ const mood = (atMs: number, patience: number, frustration: number, engagement: n
 
 export const liveCallTimeline: Timed<LiveEvent>[] = [
   e(0, { type: "call_started", call: liveCall }),
+  e(400, {
+    type: "customer_memory",
+    customerLabel: "Suresh Patil",
+    items: [
+      {
+        text: "3 Oct: complained that weekend orders are flat; was promised a callback with Premium pricing, which never happened.",
+        source: "call:call_live_prev1",
+        at: "2026-10-03T11:20:00.000Z",
+      },
+      {
+        text: "3 Oct: quoted Zestify's 8% commission; asked twice whether reach is guaranteed.",
+        source: "call:call_live_prev1",
+        at: "2026-10-03T11:20:00.000Z",
+      },
+    ],
+  }),
   mood(0, 60, 30, 50),
   ...spoken(t.a0),
   ...spoken(t.c1),
@@ -76,6 +92,7 @@ export const liveCallTimeline: Timed<LiveEvent>[] = [
       body: "Don't defend the rate. Pivot to guaranteed reach: 12k diners/month within 5 km. Competitor's 8% excludes their 6% listing fee.",
       triggerTurnId: t.c2.id,
       ttlMs: 20000,
+      sources: ["OnFloor Ads playbook › Competitor facts"],
     },
   }),
   talk(20000, 38),
@@ -91,6 +108,7 @@ export const liveCallTimeline: Timed<LiveEvent>[] = [
       body: "He asked for Premium. Confirm the weekend goal, then quote Premium with reach numbers.",
       triggerTurnId: t.c3.id,
       ttlMs: 20000,
+      sources: ["OnFloor Ads playbook › Upsell and closing signals"],
     },
   }),
   partial(t.a2, 4),

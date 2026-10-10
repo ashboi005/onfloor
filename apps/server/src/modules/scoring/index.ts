@@ -20,6 +20,7 @@ import { services } from "../../core/services";
 import { db } from "../../services";
 import { getPersona } from "../personas";
 import { getScenario } from "../scenarios";
+import { formatSnippets, goldenExamples, groundingFacts, rememberCall } from "../knowledge";
 import { computeStats, crmAudit, toolAccuracyScore } from "./analytics";
 
 /**
@@ -89,6 +90,10 @@ function judgePrompt(input: {
   turns: TranscriptTurn[];
   stats: Scorecard["stats"];
   audit: Scorecard["crmAudit"];
+  /** RAG: approved facts from the playbook / price sheets. */
+  facts: string;
+  /** RAG: real lines from strong calls. */
+  golden: string;
 }): string {
   const { scenario, persona } = input;
   return `You are a senior QA auditor for a B2B sales call centre selling local advertising (OnFloor Ads) to merchants. Score the AGENT, not the customer.
@@ -101,7 +106,15 @@ ${persona ? `Customer: ${persona.name}, ${persona.role} (${persona.archetype}).`
 # POLICIES
 ${input.policies.map((p) => `- [${p.severity}] ${p.id}: ${p.rule}${p.goldenLine ? ` (approved phrasing: "${p.goldenLine}")` : ""}`).join("\n")}
 
-# STATS (computed, trust these)
+${
+    input.facts
+      ? `# APPROVED FACTS (from the OnFloor knowledge base, the source of truth)\nIf the agent quoted a price, guarantee, timeline or policy that contradicts these, that is a compliance mistake: say which fact it contradicts.\n${input.facts}\n\n`
+      : ""
+  }${
+    input.golden
+      ? `# TOP-REP EXAMPLES (real lines from strong calls)\nPrefer adapting these when writing goldenLine.\n${input.golden}\n\n`
+      : ""
+  }# STATS (computed, trust these)
 duration ${mmss(input.stats.durationMs)}, agent talk ${input.stats.agentTalkPct}%, interruptions ${input.stats.interruptions}, dead-air gaps >5s ${input.stats.deadAirCount}, longest agent monologue ${Math.round(input.stats.longestMonologueMs / 1000)}s, ${input.stats.wpm} wpm.
 
 ${
@@ -149,6 +162,14 @@ export async function scoreCall(callId: string): Promise<Scorecard> {
         ? crmAudit(persona.crmRequests, scenario.initialCrm, await calls.crmLog(callId))
         : [];
 
+    // RAG: ground the judge in the playbook and in what top reps actually said.
+    const customerText = turns.filter((t) => t.speaker === "customer").map((t) => t.text).join(" ");
+    const agentText = turns.filter((t) => t.speaker === "agent").map((t) => t.text).join(" ");
+    const [facts, golden] = await Promise.all([
+      groundingFacts(`${agentText}\n${customerText}`.slice(0, 3000), 5),
+      goldenExamples(customerText.slice(0, 2000), 3),
+    ]);
+
     const judged: Judgement = await services.llm.json({
       job: "scoring",
       schemaName: "call_judgement",
@@ -156,7 +177,17 @@ export async function scoreCall(callId: string): Promise<Scorecard> {
       temperature: 0.2,
       maxTokens: 4000,
       timeoutMs: 90_000,
-      messages: [{ role: "user", content: judgePrompt({ kind: call.kind, scenario, persona, policies, turns, stats, audit }) }],
+      messages: [{ role: "user", content: judgePrompt({
+            kind: call.kind,
+            scenario,
+            persona,
+            policies,
+            turns,
+            stats,
+            audit,
+            facts: formatSnippets(facts),
+            golden: formatSnippets(golden, 1200),
+          }) }],
     });
 
     const ids = new Set(turns.map((t) => t.id));
@@ -212,6 +243,8 @@ export async function scoreCall(callId: string): Promise<Scorecard> {
       .values({ callId, body: card })
       .onConflictDoUpdate({ target: scorecards.callId, set: { body: card } });
     await calls.setStatus(callId, "scored", card.overall);
+    // RAG write-back: agent weak spots, golden lines, customer memory. Never blocks or fails scoring.
+    void rememberCall(callId, card);
     return card;
   } catch (err) {
     await calls.setStatus(callId, "failed");

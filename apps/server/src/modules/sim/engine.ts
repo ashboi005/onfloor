@@ -17,6 +17,7 @@ import type { ChatMessage } from "../../core/services/llm";
 import type { SynthesizedAudio } from "../../core/services/tts";
 import { replayTimeline, swapId } from "../../core/timeline";
 import { ENV } from "../../env.server";
+import { agentWeakSpots } from "../knowledge";
 import { getPersona } from "../personas";
 import { getScenario, listScenarios } from "../scenarios";
 import { scoreInBackground } from "../scoring";
@@ -102,14 +103,21 @@ const broadcast = (s: Session, msg: SimServerMessage) => {
 /** Rough spoken duration, for timers only (the browser reports the real end via playback_ended). */
 const estimateMs = (text: string) => Math.max(1200, text.split(/\s+/).length * 380 + 400);
 
-function newSession(callId: string, agentId: string, persona: Persona, scenario: Scenario, language: StartSim["language"]): Session {
+function newSession(
+  callId: string,
+  agentId: string,
+  persona: Persona,
+  scenario: Scenario,
+  language: StartSim["language"],
+  weakSpots: string[] = [],
+): Session {
   return {
     callId,
     agentId,
     persona,
     scenario,
     language,
-    system: buildSystemPrompt(persona, scenario, language),
+    system: buildSystemPrompt(persona, scenario, language, weakSpots),
     sockets: new Set(),
     started: false,
     finished: false,
@@ -149,8 +157,15 @@ export async function startSim(agent: Agent, input: StartSim): Promise<SimSessio
     personaId: persona.id,
     replayOfCallId: input.replayOfCallId ?? null,
   });
-  sessions.set(call.id, newSession(call.id, agent.id, persona, scenario, input.language));
-  return { callId: call.id, scenario, persona, sttUrl: await sttUrlFor(call.id, input.language) };
+  // RAG: this agent's past mistakes on similar ground, fetched alongside the STT token.
+  const [weak, sttUrl] = await Promise.all([
+    agentWeakSpots(agent.id, `${scenario.objective} ${persona.objections.join(" ")} ${persona.tactics.join(" ")}`, 3),
+    sttUrlFor(call.id, input.language),
+  ]);
+  const weakSpots = weak.map((w) => w.text.replace(/\s+/g, " ").slice(0, 300));
+  if (weakSpots.length) console.log(`[sim] ${call.id}: pressing on ${weakSpots.length} weak spot(s) from ${agent.name}'s past calls`);
+  sessions.set(call.id, newSession(call.id, agent.id, persona, scenario, input.language, weakSpots));
+  return { callId: call.id, scenario, persona, sttUrl };
 }
 
 /** A fresh single-use STT URL ("" when ElevenLabs isn't configured). */

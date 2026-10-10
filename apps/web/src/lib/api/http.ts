@@ -4,6 +4,9 @@ import {
   callSchema,
   callWithTranscriptSchema,
   endSimResponseSchema,
+  knowledgeSnippetSchema,
+  knowledgeSourceSchema,
+  knowledgeStatusSchema,
   personaSchema,
   scenarioSchema,
   scorecardSchema,
@@ -52,4 +55,10 @@ export const httpClient: ApiClient = {
   replayCall: (callId) => request(simSessionStartSchema, `/api/calls/${callId}/replay`, post()),
   activeLiveCall: () => request(callSchema.nullable(), "/api/live/active"),
   simulateLiveCall: () => request(z.object({ callId: z.string() }), "/api/live/dev/simulate", post()),
+  knowledgeStatus: () => request(knowledgeStatusSchema, "/api/knowledge/status"),
+  knowledgeDocs: () => request(z.array(knowledgeSourceSchema), "/api/knowledge/docs"),
+  uploadKnowledgeDoc: (doc) => request(z.object({ source: z.string(), chunks: z.number() }), "/api/knowledge/docs", post(doc)),
+  deleteKnowledgeDoc: (source) =>
+    request(z.object({ removed: z.string() }), `/api/knowledge/docs/${encodeURIComponent(source)}`, { method: "DELETE" }),
+  searchKnowledge: (q, scope, key) => request(z.array(knowledgeSnippetSchema), `/api/knowledge/search${qs({ q, scope, key })}`),
 };

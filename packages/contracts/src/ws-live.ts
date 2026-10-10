@@ -18,6 +18,8 @@ export const hintSchema = z.object({
   triggerTurnId: z.string().nullable(),
   /** The HUD hides it after this unless pinned. */
   ttlMs: z.number().int(),
+  /** Knowledge-base titles the hint was grounded in (RAG), e.g. ["OnFloor Ads playbook"]. */
+  sources: z.array(z.string()).optional(),
 });
 export type Hint = z.infer<typeof hintSchema>;
 
@@ -34,6 +36,15 @@ const pct = z.number().min(0).max(100);
 
 export const liveEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("call_started"), call: callSchema }),
+  /**
+   * What OnFloor remembers about this customer from earlier calls (RAG, customer scope).
+   * Sent right after call_started; `items` is empty for a first-time caller.
+   */
+  z.object({
+    type: z.literal("customer_memory"),
+    customerLabel: z.string(),
+    items: z.array(z.object({ text: z.string(), source: z.string(), at: z.string().nullable() })),
+  }),
   /** In-flight text; overwrite per speaker. */
   z.object({ type: z.literal("transcript_partial"), speaker: z.enum(SPEAKERS), text: z.string() }),
   z.object({ type: z.literal("transcript_final"), turn: transcriptTurnSchema }),

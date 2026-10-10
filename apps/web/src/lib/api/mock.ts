@@ -10,6 +10,8 @@ import {
   simCallTranscript,
   LIVE_CALL_ID,
   liveCall,
+  knowledgeSnippets,
+  knowledgeSources,
 } from "@onfloor/contracts/fixtures";
 import { type ApiClient, ApiClientError } from "./client";
 
@@ -115,4 +117,9 @@ export const mockClient: ApiClient = {
   },
   activeLiveCall: () => delay(liveCall),
   simulateLiveCall: () => delay({ callId: LIVE_CALL_ID }),
+  knowledgeStatus: () => delay({ enabled: true, collection: "onfloor_knowledge", sources: knowledgeSources.length }),
+  knowledgeDocs: () => delay(knowledgeSources),
+  uploadKnowledgeDoc: (doc) => delay({ source: doc.source ?? doc.title.toLowerCase().replace(/\W+/g, "-"), chunks: 3 }),
+  deleteKnowledgeDoc: (source) => delay({ removed: source }),
+  searchKnowledge: () => delay(knowledgeSnippets),
 };

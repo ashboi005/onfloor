@@ -1,6 +1,6 @@
 "use client";
 
-import type { CallKind, PersonaSource, StartSim } from "@onfloor/contracts";
+import type { CallKind, CreateKnowledgeDoc, KnowledgeScopeKind, PersonaSource, StartSim } from "@onfloor/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./instance";
 
@@ -59,3 +59,16 @@ export function useReplayCall() {
 }
 
 export const useSimulateLiveCall = () => useMutation({ mutationFn: () => api.simulateLiveCall() });
+
+// --- Knowledge (RAG) ---
+export const useKnowledgeStatus = () => useQuery({ queryKey: ["knowledge", "status"], queryFn: () => api.knowledgeStatus() });
+export const useKnowledgeDocs = () => useQuery({ queryKey: ["knowledge", "docs"], queryFn: () => api.knowledgeDocs() });
+export const useKnowledgeSearch = (q: string, scope?: KnowledgeScopeKind, key?: string) =>
+  useQuery({ queryKey: ["knowledge", "search", q, scope, key], queryFn: () => api.searchKnowledge(q, scope, key), enabled: q.trim().length > 1 });
+export function useUploadKnowledgeDoc() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (doc: CreateKnowledgeDoc) => api.uploadKnowledgeDoc(doc),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["knowledge"] }),
+  });
+}

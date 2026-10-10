@@ -2,6 +2,7 @@ export * from "./api";
 export * from "./call";
 export * from "./crm";
 export * from "./domain";
+export * from "./knowledge";
 export * from "./persona";
 export * from "./scenario";
 export * from "./scorecard";

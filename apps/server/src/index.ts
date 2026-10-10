@@ -7,6 +7,7 @@ import { services } from "./core/services";
 import { llmKeyStatus } from "./core/services/llm";
 import { ENV } from "./env.server";
 import { callRoutes } from "./modules/calls/routes";
+import { knowledgeRoutes } from "./modules/knowledge/routes";
 import { liveRoutes } from "./modules/live/routes";
 import { personaRoutes } from "./modules/personas/routes";
 import { scenarioRoutes } from "./modules/scenarios";
@@ -22,6 +23,7 @@ import { auth } from "./services";
     /api/sim/*, /ws/sim  Ashwath
     /api/calls/*         Ashwath (list, transcript, scorecard, replay)
     /api/live/*, /ws/live, /internal/live/ingest   Tushar
+    /api/knowledge/*     RAG: org docs + search (Ashwath)
     /files/*             local storage (recordings, audio)
 
   NEVER add a catch-all `GET /*` route: it swallows /api/auth/* (elysia#1515).
@@ -56,6 +58,7 @@ const app = new Elysia({ websocket: { idleTimeout: 960 } })
       elevenlabs: Boolean(ENV.ELEVENLABS_API_KEY),
       sarvam: Boolean(ENV.SARVAM_API_KEY),
       bridge: Boolean(ENV.BRIDGE_SECRET),
+      rag: services.knowledge.enabled,
     },
   }))
   .use(authGuard)
@@ -73,6 +76,7 @@ const app = new Elysia({ websocket: { idleTimeout: 960 } })
   .use(simRoutes)
   .use(callRoutes)
   .use(liveRoutes)
+  .use(knowledgeRoutes)
   .listen(ENV.PORT, () => {
     console.log(`OnFloor API on http://localhost:${ENV.PORT}  (stub engines: ${ENV.STUB_ENGINES})`);
   });

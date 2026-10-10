@@ -5,8 +5,10 @@
 import { personas, scenarios } from "@onfloor/contracts/fixtures";
 import { user } from "@onfloor/db/schema";
 import { eq } from "drizzle-orm";
+import { ingestPlaybook } from "../modules/knowledge";
 import { createPersona } from "../modules/personas";
 import { upsertScenario } from "../modules/scenarios";
+import { services } from "../core/services";
 import { auth, db } from "../services";
 
 const PASSWORD = process.env.SEED_PASSWORD ?? "OnFloorDemo!2026";
@@ -34,6 +36,13 @@ for (const s of scenarios) {
 for (const { id, createdAt: _, ...p } of personas) {
   await createPersona(p, id);
   console.log(`  persona  ${id} (${p.source})`);
+}
+
+if (services.knowledge.enabled) {
+  const { chunks } = await ingestPlaybook();
+  console.log(`  knowledge playbook (${chunks} chunks)`);
+} else {
+  console.log("  knowledge skipped (VECTOR_DATABASE_URL unset)");
 }
 
 console.log(`\nSeeded. Password for every account: ${PASSWORD}`);

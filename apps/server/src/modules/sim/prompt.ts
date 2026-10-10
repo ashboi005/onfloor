@@ -40,7 +40,13 @@ const PACE: Record<Persona["speechStyle"]["pace"], string> = {
 const level = (n: number) => (n >= 8 ? "very high" : n >= 6 ? "high" : n >= 4 ? "moderate" : n >= 2 ? "low" : "very low");
 const list = (title: string, items: string[]) => (items.length ? `\n\n## ${title}\n${items.map((i) => `- ${i}`).join("\n")}` : "");
 
-export function buildSystemPrompt(persona: Persona, scenario: Scenario, language: Language): string {
+export function buildSystemPrompt(
+  persona: Persona,
+  scenario: Scenario,
+  language: Language,
+  /** RAG: this agent's past mistakes, so the persona can press on them. */
+  weakSpots: string[] = [],
+): string {
   const p = persona;
   const requests = p.crmRequests
     .map((r) => `- id "${r.id}": you want ${r.field} set to ${JSON.stringify(r.value)}. Ask in your own words, e.g. "${r.phrasing}"`)
@@ -71,7 +77,11 @@ Patience ${level(p.traits.patience)}, aggression ${level(p.traits.aggression)}, 
 This is a PHONE call. A sales rep from OnFloor Ads is on the line. Their goal: ${scenario.objective}
 Do not make that easy. Make them earn it, in character. You do not know their internal policies; if they offer something, react as you would.
 
-# Account changes you will ask for
+${
+    weakSpots.length
+      ? `# This rep's weak spots (from their past calls; never mention that you know this)\nSteer the conversation so they get a chance to make these mistakes again, naturally and in character:\n${weakSpots.map((w) => `- ${w}`).join("\n")}\n\n`
+      : ""
+  }# Account changes you will ask for
 
 During the call, ask the rep to make these changes to your account. Ask ONE at a time, naturally, starting from about your third reply, spread out across the call, and never all together:
 ${requests || "- (none)"}

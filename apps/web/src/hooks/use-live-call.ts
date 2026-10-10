@@ -11,7 +11,8 @@ import { playTimeline } from "./timeline";
  * useLiveCall: the ONLY thing the Live HUD talks to (owner: Ashwath; events: Tushar).
  *
  *   const live = useLiveCall("active");   // or a specific callId
- *   live.hints, live.guardrails, live.sentiment, live.talk, live.turns, live.partial
+ *   live.hints, live.guardrails, live.sentiment, live.talk, live.turns, live.partial,
+ *   live.customerMemory (RAG: "last time…" items; [] for a first-time caller)
  *
  * Mock mode replays fixtures/live-call.ts after a short "waiting" period (call
  * `restart()` to replay). Real mode subscribes to /ws/live/:callId and reconnects.
@@ -31,8 +32,16 @@ export interface SentimentPoint {
   engagement: number;
 }
 
+export interface CustomerMemoryItem {
+  text: string;
+  source: string;
+  at: string | null;
+}
+
 export interface LiveCallState {
   call: Call | null;
+  /** RAG: what OnFloor remembers about this customer from earlier calls ([] = first call). */
+  customerMemory: CustomerMemoryItem[];
   status: LiveStatus;
   turns: TranscriptTurn[];
   /** In-flight text per speaker; cleared when that speaker's final arrives. */
@@ -51,6 +60,7 @@ export interface LiveCallState {
 
 const initial: LiveCallState = {
   call: null,
+  customerMemory: [],
   status: "waiting",
   turns: [],
   partial: { agent: "", customer: "" },
@@ -92,6 +102,8 @@ export function liveReducer(s: LiveCallState, a: Action): LiveCallState {
       switch (e.type) {
         case "call_started":
           return { ...initial, call: e.call, status: "live" };
+        case "customer_memory":
+          return { ...s, customerMemory: e.items };
         case "transcript_partial":
           return { ...s, partial: { ...s.partial, [e.speaker]: e.text } };
         case "transcript_final":

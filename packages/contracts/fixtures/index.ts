@@ -2,6 +2,8 @@ import { z } from "zod";
 import {
   agentSchema,
   callSchema,
+  knowledgeSnippetSchema,
+  knowledgeSourceSchema,
   liveEventSchema,
   personaSchema,
   scenarioSchema,
@@ -10,6 +12,7 @@ import {
   transcriptTurnSchema,
 } from "../src";
 import { agents, calls, currentAgent } from "./calls";
+import { knowledgeSnippets, knowledgeSources } from "./knowledge";
 import { LIVE_CALL_ID, LIVE_PERSONA_ID, liveCall, liveCallTimeline, liveCallTranscript } from "./live-call";
 import { personas, VOICES } from "./personas";
 import { DEFAULT_POLICIES, premiumRestaurant, scenarios } from "./scenarios";
@@ -21,6 +24,8 @@ import { SIM_CALL_ID, simCallTimeline, simCallTranscript } from "./sim-call";
   time anyone runs the app, not silently in a demo.
 */
 z.array(agentSchema).parse(agents);
+z.array(knowledgeSourceSchema).parse(knowledgeSources);
+z.array(knowledgeSnippetSchema).parse(knowledgeSnippets);
 z.array(personaSchema).parse(personas);
 z.array(scenarioSchema).parse(scenarios);
 z.array(callSchema).parse(calls);
@@ -41,6 +46,8 @@ export {
   calls,
   currentAgent,
   DEFAULT_POLICIES,
+  knowledgeSnippets,
+  knowledgeSources,
   LIVE_CALL_ID,
   LIVE_PERSONA_ID,
   liveCall,

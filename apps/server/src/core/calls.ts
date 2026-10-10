@@ -131,6 +131,15 @@ export const calls = {
     await db.update(transcriptTurns).set({ endMs }).where(eq(transcriptTurns.id, turnId));
   },
 
+  /** Live calls: the Telegram user id, the key for that customer's memory. */
+  async externalCustomerId(callId: string): Promise<string | null> {
+    const [row] = await db
+      .select({ id: callsTable.externalCustomerId })
+      .from(callsTable)
+      .where(eq(callsTable.id, callId));
+    return row?.id ?? null;
+  },
+
   async end(callId: string, status: CallStatus = "scoring"): Promise<Call> {
     const call = await calls.get(callId);
     const endedAt = new Date();
