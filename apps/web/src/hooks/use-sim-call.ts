@@ -26,6 +26,7 @@ import { merchants, simCallTimeline, simRingTimeline, simWrapUpTimeline } from "
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { api } from "@/lib/api";
 import { isEcho } from "@/lib/audio/echo";
+import { ECHO_TAIL_MS } from "@onfloor/contracts";
 import { downsampleTo16k, PCM_TARGET_RATE, toPcm16Base64 } from "@/lib/audio/pcm";
 import { SERVER_URL, USE_MOCKS, WS_URL } from "@/lib/config";
 import { playTimeline } from "./timeline";
@@ -305,6 +306,8 @@ export function useSimCall(start: SimSessionStart | null) {
   const personaAnalyserRef = useRef<AnalyserNode | null>(null);
   const playingRef = useRef<{ source: AudioBufferSourceNode; turnId: string; text: string } | null>(null);
   const lastPersonaTextRef = useRef("");
+  /** Epoch ms the persona's audio last stopped (0 = never played). Echo only leaks around playback. */
+  const personaEndedAtRef = useRef(0);
   const committedRef = useRef(""); // committed by STT, not yet a server turn
   const lastActivityRef = useRef(0);
   const segmentStartRef = useRef<number | null>(null);
@@ -313,6 +316,7 @@ export function useSimCall(start: SimSessionStart | null) {
     if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(msg));
   }, []);
   const callMs = () => (startedAtRef.current ? Math.max(0, Date.now() - startedAtRef.current) : 0);
+  const callMsAt = (epochMs: number) => (startedAtRef.current && epochMs ? Math.max(0, epochMs - startedAtRef.current) : -1);
 
   const stopPersonaAudio = useCallback(() => {
     const playing = playingRef.current;
@@ -414,6 +418,7 @@ export function useSimCall(start: SimSessionStart | null) {
         source.buffer = buffer;
         source.connect(personaAnalyserRef.current ?? ctx.destination);
         source.onended = () => {
+          personaEndedAtRef.current = Date.now();
           if (playingRef.current?.source === source) playingRef.current = null;
           dispatch({ type: "persona_state", state: "idle" });
           done();
@@ -476,7 +481,9 @@ export function useSimCall(start: SimSessionStart | null) {
     function onCommitted(text: string) {
       const startMs = segmentStartRef.current ?? callMs();
       segmentStartRef.current = null;
-      if (!text || isEcho(text, lastPersonaTextRef.current)) return;
+      // An echo can only be a segment that began while the persona was audible (or just after).
+      const nearPlayback = !!playingRef.current || startMs <= callMsAt(personaEndedAtRef.current + ECHO_TAIL_MS);
+      if (!text || (nearPlayback && isEcho(text, lastPersonaTextRef.current))) return;
       committedRef.current = `${committedRef.current} ${text}`.trim();
       dispatch({ type: "partial", text: committedRef.current });
       send({ type: "agent_turn", text, startMs, endMs: callMs() });

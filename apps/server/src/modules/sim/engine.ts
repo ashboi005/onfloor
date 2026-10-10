@@ -20,6 +20,8 @@ import type {
 import {
   addMonths,
   applyPersonaTuning,
+  ECHO_TAIL_MS,
+  isEcho,
   callbackSlotSchema,
   renderEmail,
   resolveRequest,
@@ -74,7 +76,12 @@ type Send = (msg: SimServerMessage) => void;
  * answer every sentence fragment separately. Must stay above the client's activity ping.
  */
 const AGENT_SETTLE_MS = 1100;
-const DEAD_AIR_MS = 7000;
+/**
+ * Silence before the customer says "Hello? Are you there?". Generous: agents pause to read the
+ * dashboard or think, and a persona that pipes up after a few seconds feels like it's talking to
+ * itself. Each further nudge needs another full stretch of silence.
+ */
+const DEAD_AIR_MS = 12_000;
 const MONOLOGUE_MS = 25_000;
 const INTERRUPT_AFTER_MS = 20_000;
 const MAX_NUDGES = 3;
@@ -117,6 +124,8 @@ interface Session {
   gen: number;
   replying: boolean;
   personaSpeakingUntil: number;
+  /** The persona's recent lines, for the echo guard. */
+  recentPersonaLines: string[];
   /** The persona turn whose audio may still be playing, so its real end can be recorded. */
   speakingTurn: { id: string; startMs: number } | null;
   lastActivityAt: number;
@@ -194,6 +203,7 @@ function newSession(input: {
     gen: 0,
     replying: false,
     personaSpeakingUntil: 0,
+    recentPersonaLines: [],
     speakingTurn: null,
     lastActivityAt: Date.now(),
     agentBuffer: [],
@@ -430,6 +440,7 @@ async function speak(s: Session, text: string) {
     endMs: startMs + durationMs,
   });
   s.history.push({ role: "assistant", content: text });
+  s.recentPersonaLines = [text, ...s.recentPersonaLines].slice(0, 2);
   if (audio) {
     const key = audioKey(s.callId, turn.id);
     audioStore.set(key, audio);
@@ -627,6 +638,14 @@ export async function handleClientMessage(callId: string, msg: SimClientMessage)
 
   switch (msg.type) {
     case "agent_turn": {
+      // Echo guard (the browser checks too): the persona's own voice leaking back through the
+      // speakers, transcribed and committed as if the agent said it. Answering it is the persona
+      // "talking to itself". Only speech that overlaps its playback (or the tail) can be an echo.
+      const segmentStartedAt = s.startedAt + msg.startMs;
+      if (segmentStartedAt <= s.personaSpeakingUntil + ECHO_TAIL_MS && isEcho(msg.text, s.recentPersonaLines)) {
+        console.log(`[sim] ${s.callId}: dropped echo "${msg.text.slice(0, 60)}"`);
+        return;
+      }
       s.lastActivityAt = now;
       s.agentTalkStartedAt ??= now;
       // New speech supersedes a reply still being generated.
