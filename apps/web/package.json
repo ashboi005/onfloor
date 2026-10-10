@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "bun ./node_modules/next/dist/bin/next dev --port 3001",
+    "dev": "next dev --port 3001",
     "build": "next build",
     "check-types": "tsc --noEmit",
     "start": "next start",
@@ -26,6 +26,8 @@
     "react-dom": "catalog:",
     "sonner": "catalog:",
     "varlock": "catalog:",
+    "@onfloor/contracts": "workspace:*",
+    "@tanstack/react-query": "^5.90.0",
     "zod": "catalog:"
   },
   "devDependencies": {
