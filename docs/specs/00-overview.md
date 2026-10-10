@@ -30,7 +30,7 @@ ask in chat. Shared files (`packages/contracts`) are Ashwath's.
 | Layer | Choice |
 |---|---|
 | Runtime / package manager | Bun (workspaces monorepo) |
-| Web | Next.js 15 (App Router) + React 19 + Tailwind v4 + shadcn/ui + TanStack Query |
+| Web | Next.js 16 (App Router) + React 19 + Tailwind v4 + shadcn/ui + TanStack Query |
 | API | Elysia on Bun (REST + WebSocket) |
 | DB | Postgres (one shared Neon/Supabase DB for the team) + Drizzle ORM |
 | Validation / shared types | Zod v4 in `packages/contracts` (one schema for API validation and client types) |
@@ -44,32 +44,38 @@ ask in chat. Shared files (`packages/contracts`) are Ashwath's.
 ## 4. Repo layout
 
 ```
-onfloor/
+onfloor/                    (scaffolded with better-t-stack; see README "Layout & owners")
   apps/
-    web/                    Next.js — Harnoor + Mansukh (+ Ashwath's lib/ and hooks/)
+    web/src/                Next.js 16 — Harnoor + Mansukh (+ Ashwath's lib/api and hooks/)
       app/
         (marketing)/        landing page                          [Mansukh]
-        (app)/layout.tsx    app shell, nav                        [Mansukh]
-        (app)/simulator/    scenario picker + workspace           [Harnoor]
+        (app)/layout.tsx    auth gate + app shell                 [Mansukh: components/shell]
+        (app)/simulator/    picker, /new?replay=, /[callId] workspace  [Harnoor]
         (app)/live/         live HUD                              [Harnoor]
         (app)/calls/        call list + scorecard pages           [Mansukh]
         (app)/personas/     persona library + "replay" button     [Mansukh]
-      components/ui/        design system primitives              [Mansukh]
+        design/             design-system QA sheet                [Mansukh]
+        login/              Better Auth sign-in                   [Mansukh styles]
       components/sim/       CRM + call terminal                   [Harnoor]
       components/hud/       HUD widgets                           [Harnoor]
       components/report/    scorecard widgets                     [Mansukh]
+      components/shell/     app shell / nav                       [Mansukh]
       lib/api/              typed client, mock + http impl        [Ashwath]
-      hooks/                useSimCall, useLiveCall, ...          [Ashwath]
-    api/                    Elysia — Ashwath + Tushar
-      src/
-        core/               config, db, services (llm, voice, stt)   [Ashwath]
-        modules/sim/        simulator engine + routes                [Ashwath]
-        modules/scoring/    QA scorecard engine                      [Ashwath]
-        modules/personas/   persona repo + routes + prompt compiler  [Ashwath]
-        modules/live/       live calls, copilot, persona extraction  [Tushar]
+      hooks/                use-sim-call.ts, use-live-call.ts     [Ashwath]
+    server/src/             Elysia — Ashwath + Tushar
+      core/                 errors, auth guard, services (llm, stt, tts, storage, knowledge), calls repo [Ashwath]
+      modules/sim/          simulator engine + routes + /ws/sim      [Ashwath]
+      modules/scoring/      QA scorecard engine                      [Ashwath]
+      modules/personas/     persona repo + routes                    [Ashwath]
+      modules/scenarios/, modules/calls/                             [Ashwath]
+      modules/live/         live calls, hub, copilot, persona extraction, /ws/live, ingest [Tushar]
+      scripts/seed.ts       demo data
     telegram-bridge/        Python (py-tgcalls) sidecar              [Tushar]
   packages/
     contracts/              Zod schemas + fixtures + WS event types  [Ashwath, frozen H+2]
+    db/                     Drizzle schema + migrations              [Ashwath]
+    auth/                   Better Auth config                       [Ashwath]
+    ui/                     design system (shadcn primitives, tokens) [Mansukh]
   docs/
     specs/                  these files
     article/                OnFloor article drafts                   [Mansukh]
@@ -80,8 +86,8 @@ onfloor/
 1. **`packages/contracts`** holds every shared shape plus **typed fixtures** (a sample
    scorecard, a sample persona, a scripted live-call event timeline, a scripted sim call).
    Fixtures are type-checked against the schemas, so they can't drift from them.
-2. **Frontend never calls `fetch` directly.** It uses `apps/web/lib/api` and the hooks in
-   `apps/web/hooks`. With `NEXT_PUBLIC_USE_MOCKS=true` these return fixtures and replay
+2. **Frontend never calls `fetch` directly.** It uses `apps/web/src/lib/api` and the hooks in
+   `apps/web/src/hooks`. With `NEXT_PUBLIC_USE_MOCKS=true` these return fixtures and replay
    the scripted timelines on a timer. Harnoor and Mansukh can build their whole UI on
    day 0 with no backend running.
 3. **Backend modules talk through interfaces, not internals.** Tushar's live module uses
@@ -121,6 +127,6 @@ through the exact same transcription → copilot → HUD path. Tushar owns this.
   `main`, merged by the owner of the target folder.
 - Never commit `.env`. Ask Ashwath for keys. Keys are server-only; nothing secret gets a
   `NEXT_PUBLIC_` prefix.
-- No tests required. Run `bun run typecheck` before you push.
+- No tests required. Run `bun run check-types` before you push.
 - If you're blocked for more than 20 minutes, say so in chat. Don't wait it out.
 - Ideas that don't fit the 24h (RAG personalisation etc.) go in `06-future-scope.md`, not into the build.

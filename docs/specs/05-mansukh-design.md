@@ -4,9 +4,10 @@ You set how OnFloor looks and reads. That covers the visual system everyone else
 with, the landing page judges see first, the scorecard screens that close the demo, and the
 written story (the article).
 
-Your folders: `apps/web/app/(marketing)/`, `apps/web/app/(app)/layout.tsx`,
-`apps/web/app/(app)/calls/`, `apps/web/app/(app)/personas/`, `apps/web/components/ui/`,
-`apps/web/components/report/`, `docs/article/`, `apps/web/public/brand/`.
+Your folders: `apps/web/src/app/(marketing)/`, `apps/web/src/components/shell/` (the shell used by
+`(app)/layout.tsx`), `apps/web/src/app/(app)/calls/`, `apps/web/src/app/(app)/personas/`,
+`apps/web/src/app/design/`, `packages/ui/` (design system: tokens in `src/styles/globals.css`),
+`apps/web/src/components/report/`, `docs/article/`, `apps/web/public/brand/`.
 
 Data comes from `lib/api` hooks (`useCalls`, `useCall`, `useScorecard`, `usePersonas`).
 They return fixtures in mock mode from H+2. **No direct `fetch`.**
@@ -18,7 +19,7 @@ They return fixtures in mock mode from H+2. **No direct `fetch`.**
   info, because HUD and scorecard meaning rides on these), type scale, radius, shadow,
   spacing. Dark mode for the app (call centres are dim. The HUD is dark-first) and light
   for marketing if you prefer.
-- shadcn/ui themed to the tokens. Primitives in `components/ui/`: Button, Card, Badge,
+- shadcn/ui themed to the tokens. Primitives in `packages/ui/src/components/`: Button, Card, Badge,
   Tabs, Dialog, Toast, Tooltip, Slider, Switch, Input, Select, **Gauge** (radial 0–100),
   **Meter** (linear with thresholds), **ScoreRing**, **Sparkline**, **Avatar/initials**.
 - Motion guidelines: a few durations/easings as tokens. Restrained in the app, expressive

@@ -1,0 +1,5 @@
+{
+  "extends": "@onfloor/config/tsconfig.base.json",
+  "compilerOptions": { "noEmit": true },
+  "include": ["src", "fixtures", "scripts"]
+}

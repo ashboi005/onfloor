@@ -24,7 +24,7 @@ folder has working versions of everything below. The ones to read first are
                                    └──────────────────────┬───────────────────────┘
                                                           │ ws /internal/live/ingest
                                    ┌──────────────────────▼───────────────────────┐
-                                   │ apps/api modules/live (TS)                    │
+                                   │ apps/server modules/live (TS)                 │
                                    │  2× ElevenLabs realtime STT (one per channel) │
                                    │  → transcript → copilot → /ws/live → HUD      │
                                    └───────────────────────────────────────────────┘
@@ -82,7 +82,7 @@ app = Client("onfloor", session_string=os.environ["TELEGRAM_SESSION_STRING"],
              api_id=int(os.environ["TELEGRAM_API_ID"]), api_hash=os.environ["TELEGRAM_API_HASH"])
 calls = PyTgCalls(app)
 active_chat: int | None = None
-api_ws = None                             # websocket to apps/api
+api_ws = None                             # websocket to apps/server
 
 @calls.on_update(fl.chat_update(ChatUpdate.Status.INCOMING_CALL))
 async def on_incoming(_, update: ChatUpdate):

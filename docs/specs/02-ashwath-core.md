@@ -3,24 +3,27 @@
 **You are the critical path for H0–2.** Everyone else is building on the mocks you push. Ship
 contracts and stubs before you write any real logic.
 
+> **Status (scaffold commit):** D1–D3 done; D4 (LLM toggle) real; STT token/URL real. Remaining:
+> TTS port, real `useSimCall` audio, D6 engine, D7 judge, D8 replay is wired (uses the stub engine).
+
 ## Deliverables in unblock order
 
 ### D1. Scaffold + contracts (by H+1.5): unblocks everyone
-- Bun workspaces: `apps/web` (Next 15), `apps/api` (Elysia), `apps/telegram-bridge` (empty
+- Bun workspaces: `apps/web` (Next 16), `apps/server` (Elysia), `apps/telegram-bridge` (empty
   dir + README for Tushar), `packages/contracts`.
-- Root scripts: `dev` (web + api via concurrently), `typecheck`, `lint` (Biome),
+- Root scripts: `dev` (web + server), `check-types`,
   `db:generate`, `db:migrate`, `db:seed`, `contracts:jsonschema`.
 - `packages/contracts`: every schema in `01-contracts.md` + every fixture in §11.
   The fixtures must pass `schema.parse()` at import time in dev.
 - `.env.example` with every var below. Root `README` with setup steps.
 
 ### D2. Web data layer + hook stubs (by H+2): unblocks Harnoor & Mansukh
-- `apps/web/lib/api/`: an `ApiClient` interface, with `mockClient` (fixtures, 300ms fake
+- `apps/web/src/lib/api/`: an `ApiClient` interface, with `mockClient` (fixtures, 300ms fake
   latency) and `httpClient` (fetch + Zod parse) implementations. `NEXT_PUBLIC_USE_MOCKS`
   picks one. TanStack Query hooks on top of it: `useScenarios`, `usePersonas`, `useCall`,
   `useCalls`, `useScorecard` (polls while 404), `useStartSim`, `useReplayCall`, `useMe`.
   In mock mode, auth is bypassed with a fixture agent.
-- `apps/web/hooks/useSimCall.ts`: the **only** thing Harnoor's sim UI talks to:
+- `apps/web/src/hooks/use-sim-call.ts` (`useSimCall`): the **only** thing Harnoor's sim UI talks to:
   ```ts
   useSimCall(start: SimSessionStart | null) => {
     status: "connecting" | "live" | "ending" | "ended" | "error",
@@ -38,7 +41,7 @@ contracts and stubs before you write any real logic.
   Mock mode replays `fixtures/sim-call.ts` and fakes the mic. Real mode does the mic,
   ElevenLabs realtime STT, persona audio playback and barge-in (AudioWorklet mic capture, 16 kHz PCM framing,
   echo rejection).
-- `apps/web/hooks/useLiveCall.ts`:
+- `apps/web/src/hooks/use-live-call.ts` (`useLiveCall`):
   ```ts
   useLiveCall(callId: string | "active") => {
     call: Call | null, status: "waiting" | "live" | "ended",
@@ -54,11 +57,11 @@ contracts and stubs before you write any real logic.
   Tushar's events are only ever consumed through this reducer.
 
 ### D3. API skeleton + service seam (by H+3): unblocks Tushar
-- `apps/api/src/core/config.ts`: Zod-validated env, checked at boot.
+- Env: varlock (`apps/server/.env.schema` → generated `src/env.ts`, imported via `env.server.ts`).
 - `core/auth`: Better Auth (instance, route guards, drizzle adapter, the generated
   `auth.ts` schema). Email/password, sign-up off, seeded accounts. Next.js uses
   `better-auth/react` client + a `/login` page. Add the Next origin to `TRUSTED_ORIGINS`.
-- `core/db`: Drizzle schema for `agents` (= Better Auth `user`, role `agent`|`manager`), `personas`, `scenarios`, `calls`,
+- `packages/db`: Drizzle schema for `agents` (= Better Auth `user`, role `agent`|`manager`), `personas`, `scenarios`, `calls`,
   `transcript_turns`, `crm_actions`, `scorecards`, `live_events` (append-only HUD log).
   JSON columns for persona/scorecard bodies; don't normalise.
 - `core/services/index.ts`: a lazy service registry (`services.llm`,

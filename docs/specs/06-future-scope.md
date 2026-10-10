@@ -15,7 +15,7 @@ history, and *this* agent's past mistakes. That makes OnFloor personalised inste
 generic, and it's the natural next pitch after the hackathon.
 
 ### Stack
-- **Mastra** (`@mastra/core`, `@mastra/rag`) inside `apps/api`, as a new module
+- **Mastra** (`@mastra/core`, `@mastra/rag`) inside `apps/server`, as a new module
   `modules/knowledge/`. TypeScript end to end, so no new runtime.
 - **Vector store:** `pgvector` in the **same Postgres** (`@mastra/pg`). No new infra, and
   rows can join to `calls` / `personas` / agents by id.
@@ -26,7 +26,7 @@ generic, and it's the natural next pitch after the hackathon.
 
 ### The seam (ships now, empty)
 ```ts
-// apps/api/src/core/services/knowledge.ts
+// apps/server/src/core/services/knowledge.ts
 interface KnowledgeService {
   retrieve(query: string, scope: KnowledgeScope, k?: number): Promise<Snippet[]>  // [] for now
   ingest(doc: KnowledgeDoc): Promise<void>                                         // no-op for now

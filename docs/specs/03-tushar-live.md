@@ -4,7 +4,7 @@ You own Pillar 2 end to end on the backend: getting call audio out of Telegram, 
 into a speaker-labelled transcript, running the copilot brain that drives the HUD, storing
 the call, and **extracting a persona** that Pillar 1 can replay.
 
-Your folders: `apps/telegram-bridge/` (Python) and `apps/api/src/modules/live/` (TS).
+Your folders: `apps/telegram-bridge/` (Python) and `apps/server/src/modules/live/` (TS).
 Your output contract: the `/ws/live` events in `01-contracts.md §10`. Harnoor's HUD is
 built against `fixtures/live-call.ts`, so **make your real stream look like that
 fixture.** Use it as your acceptance test.
@@ -104,7 +104,7 @@ simulator can replay it. Nothing else is needed from you.
 Accepts a stereo WAV (L = agent, R = customer) or two mono files. It streams them in real
 time (not faster) through the **same** path as the bridge ingest. So we can demo the full
 HUD with no Telegram and no network luck. Record 2 good demo calls by H+16 and keep them in
-`apps/api/demo-audio/`.
+`apps/server/demo-audio/`.
 
 ## 6. Routes you own
 
@@ -137,6 +137,6 @@ TELEGRAM_API_ID=
 TELEGRAM_API_HASH=
 TELEGRAM_SESSION_STRING=      # exported once after the first interactive login
 BRIDGE_SECRET=
-API_INGEST_URL=ws://localhost:3001/internal/live/ingest
+API_INGEST_URL=ws://localhost:3000/internal/live/ingest
 LIVE_DEFAULT_LANGUAGE=hinglish
 ```

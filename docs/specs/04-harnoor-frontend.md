@@ -5,9 +5,9 @@ their data from one hook each (`useSimCall`, `useLiveCall`) written by Ashwath. 
 hooks run on **mock timelines** from H+2, so you never need the backend running until the
 H+14 integration checkpoint.
 
-Your folders: `apps/web/app/(app)/simulator/`, `apps/web/app/(app)/live/`,
-`apps/web/components/sim/`, `apps/web/components/hud/`.
-Use Mansukh's primitives from `components/ui/` (Button, Card, Badge, Gauge, Meter, Toast…).
+Your folders: `apps/web/src/app/(app)/simulator/`, `apps/web/src/app/(app)/live/`,
+`apps/web/src/components/sim/`, `apps/web/src/components/hud/`.
+Use Mansukh's primitives from `packages/ui` (`@onfloor/ui/components/*`) (Button, Card, Badge, Gauge, Meter, Toast…).
 If you need one that doesn't exist yet, build it in your folder and tell Mansukh, who can
 promote it to `ui/` later.
 
