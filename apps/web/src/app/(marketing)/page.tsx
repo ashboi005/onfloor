@@ -2,10 +2,14 @@ import Link from "next/link";
 import { ArrowRight, PlayCircle, Bot, Zap, Activity, Repeat, Globe, Server, AudioLines, Sparkles, Send } from "lucide-react";
 import { CrowdCanvas } from "@/components/crowd-canvas";
 import TechText from "@/components/tech-text";
+import { ModeToggle } from "@/components/mode-toggle";
 
 export default function Landing() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <div className="fixed bottom-5 left-5 z-50 rounded-lg bg-background/90 p-1 shadow-lg backdrop-blur-md" aria-label="Appearance">
+        <ModeToggle />
+      </div>
       {/* 1. Hero Section */}
       <section className="relative mx-auto flex w-full flex-col items-center px-6 py-24 text-center md:py-32 overflow-hidden border-b">
         <CrowdCanvas src="https://cdn.21st.dev/assets/localized/abdb8990a7bef8c2f5af3e45f0a3c969c4b0603fba8be92e81347de4ea4e1ed7.png" rows={15} cols={7} />
@@ -15,7 +19,7 @@ export default function Landing() {
             <span className="flex h-2 w-2 rounded-full bg-green-500 mr-2"></span>
             Live Copilot is now in beta
           </div>
-          <div className="w-full h-[250px] md:h-[400px] relative mb-2">
+          <div className="w-full h-[250px] md:h-[400px] relative mb-2 invert dark:invert-0">
             <TechText
               text="OnFloor"
               fontWeight={800}
@@ -40,7 +44,7 @@ export default function Landing() {
             />
           </div>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl mb-6 drop-shadow-sm">
-            Risk-free training. <span className="bg-gradient-to-r from-blue-500 to-teal-400 bg-clip-text text-transparent">Win the call.</span>
+            Risk-free training. <span className="bg-gradient-to-r from-blue-600 to-teal-600 dark:from-blue-500 dark:to-teal-400 bg-clip-text text-transparent">Win the call.</span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mb-10 bg-background/40 backdrop-blur-sm p-4 rounded-xl border border-border/50">
             Train agents against adversarial AI customers, coach them live during real calls, and get an instant QA score the moment they hang up.
