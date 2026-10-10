@@ -11,6 +11,11 @@ test("guardrails distinguish a promise from refusal, quotes, and approval reques
   expect(detectViolations("I guarantee more orders").find((p) => p.id === "pol_guarantee")?.severity).toBe("warn");
   expect(detectViolations("I guarantee a full refund").map((p) => p.id)).toContain("pol_refund");
   expect(detectViolations("Kal tak activation ho jayega").map((p) => p.id)).toContain("pol_activation");
+  expect(detectViolations("कल तक activate कर देंगे").map((p) => p.id)).toContain("pol_activation");
+  expect(detectViolations("15 प्रतिशत डिस्काउंट देंगे").map((p) => p.id)).toContain("pol_discount");
+  expect(detectViolations("१५% छूट देंगे").map((p) => p.id)).toContain("pol_discount");
+  expect(detectViolations("ऑर्डर की गारंटी देंगे").map((p) => p.id)).toContain("pol_guarantee");
+  expect(detectViolations("रिफंड पक्का देंगे").map((p) => p.id)).toContain("pol_refund");
 });
 
 test("metrics handle overlaps, silence and unfinished monologues", () => {
@@ -24,4 +29,14 @@ test("metrics handle overlaps, silence and unfinished monologues", () => {
   expect(metrics.read(55_100).alert).toBe("monologue");
   // Rolling windows expire; silence is not a speaking interval.
   expect(metrics.read(200_000).agentTalkPct).toBe(0);
+});
+
+test("metrics wait for substantial talk and measure silence from audio rather than STT receipt", () => {
+  const metrics = new TalkMetrics();
+  metrics.note("agent", 0, 3500);
+  expect(metrics.read(3500).alert).toBeNull();
+  metrics.note("customer", 46_000, 54_700);
+  metrics.turn({ id: "turn", callId: "call", seq: 1, speaker: "customer", text: "hello", startMs: 46_000, endMs: 57_400 });
+  expect(metrics.read(62_200).currentSilenceMs).toBe(7500);
+  expect(metrics.read(62_200).alert).toBe("dead_air");
 });

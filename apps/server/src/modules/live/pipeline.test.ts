@@ -12,6 +12,7 @@ const personas = new Map<string, Persona>();
 const archived = new Map<string, Uint8Array>();
 let token = 0, failScore = false, failStorage = false, failEnd = false;
 let customerDelay = 0, customerFailure = false, suggestedHint = false;
+let personaQuotesInvalid = false;
 let knowledgeEnabled = false;
 const knowledgeRequests: Array<{ kind: string; customerKey?: string }> = [];
 const sockets: Array<{ close(): void }> = [];
@@ -62,7 +63,12 @@ mock.module("../../core/calls", () => ({ calls: {
   async end(id: string, status: Call["status"]) { if (failEnd) throw new Error("end write unavailable"); const call = rows.get(id)!; call.status = status; call.endedAt = new Date().toISOString(); call.durationMs = Date.now() - Date.parse(call.startedAt); return { ...call }; },
   async setPersona(id: string, personaId: string) { rows.get(id)!.personaId = personaId; },
   async setRecording(id: string, url: string) { rows.get(id)!.recordingUrl = url; },
-  async setTurnTranslation() {}, // [added by Ashwath] subtitles write-back (silences test noise)
+  async setTurnTranslation(turnId: string, translation: string) {
+    for (const turns of transcripts.values()) {
+      const turn = turns.find((item) => item.id === turnId);
+      if (turn) { turn.translation = translation; return; }
+    }
+  },
 } }));
 mock.module("./index", () => ({
   async agentIdByEmail() { return owner.id; },
@@ -95,7 +101,7 @@ mock.module("../../core/services", () => ({ services: {
     if (failStorage) throw new Error("storage unavailable");
     archived.set(key, bytes); return { key, url: `https://example.invalid/files/${key}` };
   } },
-  llm: { async json(input: { schemaName: string; schema: { parse(value: unknown): unknown } }) {
+  llm: { async chat() { return "Please pause my campaign"; }, async json(input: { schemaName: string; schema: { parse(value: unknown): unknown } }) {
     if (input.schemaName === "live_customer_analysis") {
       if (customerFailure) throw new Error("customer model unavailable");
       await Bun.sleep(customerDelay);
@@ -104,10 +110,9 @@ mock.module("../../core/services", () => ({ services: {
     }
     if (input.schemaName === "live_agent_guardrails") return input.schema.parse({ alerts: [] });
     const { suresh } = await import("@onfloor/contracts/fixtures");
-    return input.schema.parse({ ...suresh, openingLine: "Please pause my campaign",
-      speechStyle: { ...suresh.speechStyle, catchphrases: ["Please pause my campaign"] },
+    return input.schema.parse({ ...suresh, demographicEvidence: null, openingLine: personaQuotesInvalid ? "Invented opening" : "Please pause my campaign",
+      speechStyle: { ...suresh.speechStyle, catchphrases: [personaQuotesInvalid ? "Invented phrase" : "Please pause my campaign"] },
       crmRequests: [] }); // [added by Ashwath] "pause my campaign" is no longer a simulator request kind
-
   } },
 } }));
 mock.module("../../core/auth-guard", () => ({
@@ -144,6 +149,8 @@ test("two-channel shutdown saves ordered finals, recordings and an evidenced per
   const log = events.get(call.id)!;
   for (const event of log) expect(liveEventSchema.safeParse(event).success).toBe(true);
   expect(log.filter((e) => e.type === "call_ended")).toHaveLength(1);
+  expect(log.some((e) => e.type === "customer_memory")).toBe(true);
+  expect(log.some((e) => e.type === "transcript_translation")).toBe(true);
   expect(log.some((e) => e.type === "scorecard_ready")).toBe(true);
   expect(log.some((e) => e.type === "persona_ready")).toBe(true);
   expect(rows.get(call.id)!.recordingUrl).toContain("/mixed.wav");
@@ -169,16 +176,38 @@ test("recording/scoring failure still permits persona extraction and releases th
   failScore = failStorage = false;
 });
 
+test("persona is created when the model repeats unverifiable quotations after repair", async () => {
+  personaQuotesInvalid = true;
+  try {
+    const call = await session.startLiveCall({ agentId: owner.id, customerLabel: "Customer" });
+    session.pushLiveAudio(call.id, "customer", 0, audio);
+    await Bun.sleep(50);
+    await session.finishLiveCall(call.id);
+    expect(events.get(call.id)?.some((event) => event.type === "persona_ready")).toBe(true);
+    expect(personas.get(rows.get(call.id)!.personaId!)?.openingLine).toBe("Please pause my campaign");
+  } finally { personaQuotesInvalid = false; }
+});
+
 test("multipart stereo replay runs real audio path even when fixture mode is enabled", async () => {
+  knowledgeEnabled = true;
+  knowledgeRequests.length = 0;
   const form = new FormData();
   form.set("audio", new File([encodeWav([audio, audio]).buffer as ArrayBuffer], "call.wav"));
+  form.set("customerId", "telegram-customer-17");
+  form.set("customerName", "Repeat customer");
   const replay = await parseReplayFiles(form);
+  expect(replay.customerId).toBe("telegram-customer-17");
   const { callId } = await startReplay(owner.id, replay);
   await waitUntil(() => (events.get(callId) ?? []).some((e) => e.type === "persona_ready"));
   expect(transcripts.get(callId)).toHaveLength(2);
   expect(archived.has(`live/${callId}/agent.wav`)).toBe(true);
+  expect(rows.get(callId)?.customerLabel).toBe("Repeat customer");
+  expect(knowledgeRequests).toContainEqual({ kind: "customer", customerKey: "telegram-customer-17" });
   const invalid = new FormData(); invalid.set("agentAudio", new File([encodeWav([audio]).buffer as ArrayBuffer], "agent.wav"));
   await expect(parseReplayFiles(invalid)).rejects.toThrow();
+  const badName = new FormData(); badName.set("audio", form.get("audio")!); badName.set("customerName", " ");
+  await expect(parseReplayFiles(badName)).rejects.toThrow();
+  knowledgeEnabled = false;
 });
 
 test("failed call-end write does not skip independent wrap-up stages", async () => {
@@ -240,16 +269,16 @@ test("shutdown waits for delayed first partial and final", async () => {
   } finally { services.stt.realtimeUrl = original; provider.stop(true); }
 });
 
-test("copilot discards late analysis, deduplicates hints and preserves fast paths on failure", async () => {
+test("copilot accepts late analysis after a newer turn, deduplicates hints and preserves fast paths", async () => {
   const call = await session.startLiveCall({ agentId: owner.id, customerLabel: "Customer" });
   const customer = (text: string) => session.appendLiveTurn(call.id, { speaker: "customer", text, language: "hinglish", startMs: 0, endMs: 1 });
   suggestedHint = true; customerDelay = 2300;
   try {
-    await customer("Please pause my campaign"); await Bun.sleep(2400);
-    expect(events.get(call.id)!.filter((e) => e.type === "hint")).toHaveLength(0);
-    expect(events.get(call.id)!.filter((e) => e.type === "sentiment")).toHaveLength(1);
+    await customer("Please pause my campaign");
+    await customer("Explain the plan");
+    await waitUntil(() => events.get(call.id)!.filter((e) => e.type === "sentiment").length >= 3);
+    expect(events.get(call.id)!.filter((e) => e.type === "hint")).toHaveLength(1);
     customerDelay = 0;
-    await customer("Explain the plan"); await waitUntil(() => events.get(call.id)!.some((e) => e.type === "hint"));
     await customer("Explain the plan again"); await Bun.sleep(30);
     expect(events.get(call.id)!.filter((e) => e.type === "hint")).toHaveLength(1);
     customerFailure = true;

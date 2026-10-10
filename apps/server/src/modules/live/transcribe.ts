@@ -64,7 +64,8 @@ export async function openChannelStream(opts: ChannelStreamOptions): Promise<Cha
     ready = false;
     const token = await services.stt.mintRealtimeToken();
     if (stopped || current !== generation) return;
-    const ws = new WebSocket(services.stt.realtimeUrl({ language: opts.language }, token));
+    const ws = new WebSocket(services.stt.realtimeUrl({ language: opts.language,
+      keyTerms: ["OnFloor", "Zestify", "Premium", "Premium Plus", "budget", "discount", "campaign"] }, token));
     socket = ws;
     await new Promise<void>((resolve, reject) => {
       let settled = false;

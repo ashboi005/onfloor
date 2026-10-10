@@ -3,10 +3,11 @@
 import type { Persona } from "@onfloor/contracts";
 import { Button } from "@onfloor/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@onfloor/ui/components/card";
-import { AlertTriangle, Clock3, Headphones, Mic, MicOff, Phone, RotateCcw, Signal, Sparkles, UserRound, Volume2 } from "lucide-react";
+import { AlertTriangle, Clock3, Globe, Headphones, Languages, Mic, MicOff, Phone, RotateCcw, Signal, Sparkles, UserRound, Volume2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import type { SimCall } from "@/hooks/use-sim-call";
+import { subtitleText, useSubtitleMode } from "@/lib/subtitles";
 
 type CallTerminalProps = {
   persona: Persona;
@@ -47,6 +48,7 @@ export function CallTerminal({ persona, call, onEnd, onScorecard, onRetry }: Cal
   const lastPatience = useRef(call.patience);
   const patienceDropped = call.patience < lastPatience.current;
   lastPatience.current = call.patience;
+  const [subtitleMode, setSubtitleMode] = useSubtitleMode();
 
   useEffect(() => {
     const element = transcriptRef.current;
@@ -123,18 +125,33 @@ export function CallTerminal({ persona, call, onEnd, onScorecard, onRetry }: Cal
             </div>
           )}
 
-          <div ref={transcriptRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" aria-live="polite">
-            {call.turns.length === 0 && <div className="flex h-full min-h-32 flex-col items-center justify-center text-center text-xs text-muted-foreground"><Signal className="mb-3 size-5 animate-pulse" /><p>Waiting for the customer to speak…</p></div>}
-            {call.turns.map((turn) => (
-              <div key={turn.id} className={`flex gap-3 ${turn.speaker === "agent" ? "flex-row-reverse text-right" : ""}`}>
-                <div className={`mt-1 flex size-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${turn.speaker === "agent" ? "bg-sky-400/15 text-sky-300" : "bg-violet-400/15 text-violet-300"}`}>{turn.speaker === "agent" ? "A" : "C"}</div>
-                <div className={`max-w-[85%] ${turn.speaker === "agent" ? "items-end" : "items-start"}`}>
-                  <div className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground"><span>{turn.speaker === "agent" ? "You" : persona.name.split(" ")[0]}</span><span>{formatTime(turn.startMs)}</span></div>
-                  <p className={`border px-3 py-2 text-sm leading-relaxed ${turn.speaker === "agent" ? "border-sky-400/20 bg-sky-400/[0.06]" : "border-violet-400/20 bg-violet-400/[0.06]"}`}>{turn.text}</p>
-                </div>
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"><Languages className="size-3" /> Subtitles</span>
+              <div className="flex overflow-hidden border border-border/70 text-[10px]">
+                <button type="button" onClick={() => setSubtitleMode("raw")} className={`px-2.5 py-1 font-medium transition ${subtitleMode === "raw" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>Original</button>
+                <button type="button" onClick={() => setSubtitleMode("english")} className={`px-2.5 py-1 font-medium transition ${subtitleMode === "english" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>English</button>
               </div>
-            ))}
-            {call.partialAgentText && <div className="flex flex-row-reverse gap-3 text-right opacity-60"><div className="mt-1 flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-400/10 text-[9px] font-bold text-sky-300">A</div><p className="max-w-[85%] border border-dashed border-sky-400/30 px-3 py-2 text-sm italic">{call.partialAgentText}…</p></div>}
+            </div>
+            <div ref={transcriptRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" aria-live="polite">
+              {call.turns.length === 0 && <div className="flex h-full min-h-32 flex-col items-center justify-center text-center text-xs text-muted-foreground"><Signal className="mb-3 size-5 animate-pulse" /><p>Waiting for the customer to speak…</p></div>}
+              {call.turns.map((turn) => {
+                const { text, pending } = subtitleText(turn, subtitleMode);
+                return (
+                  <div key={turn.id} className={`flex gap-3 ${turn.speaker === "agent" ? "flex-row-reverse text-right" : ""}`}>
+                    <div className={`mt-1 flex size-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${turn.speaker === "agent" ? "bg-sky-400/15 text-sky-300" : "bg-violet-400/15 text-violet-300"}`}>{turn.speaker === "agent" ? "A" : "C"}</div>
+                    <div className={`max-w-[85%] ${turn.speaker === "agent" ? "items-end" : "items-start"}`}>
+                      <div className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground"><span>{turn.speaker === "agent" ? "You" : persona.name.split(" ")[0]}</span><span>{formatTime(turn.startMs)}</span></div>
+                      <p className={`border px-3 py-2 text-sm leading-relaxed ${turn.speaker === "agent" ? "border-sky-400/20 bg-sky-400/[0.06]" : "border-violet-400/20 bg-violet-400/[0.06]"} ${pending ? "italic opacity-60" : ""}`}>
+                        {text}
+                        {pending && <span className="ml-2 text-[10px] not-italic text-muted-foreground">translating…</span>}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+              {call.partialAgentText && <div className="flex flex-row-reverse gap-3 text-right opacity-60"><div className="mt-1 flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-400/10 text-[9px] font-bold text-sky-300">A</div><p className="max-w-[85%] border border-dashed border-sky-400/30 px-3 py-2 text-sm italic">{call.partialAgentText}…</p></div>}
+            </div>
           </div>
 
           {call.status === "ended" && (

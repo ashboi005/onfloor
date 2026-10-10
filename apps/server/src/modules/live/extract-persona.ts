@@ -1,11 +1,13 @@
 import { type CreatePersona, createPersonaSchema, type Persona, type Language } from "@onfloor/contracts";
 import { VOICES } from "@onfloor/contracts/fixtures";
+import { z } from "zod";
 import { calls } from "../../core/calls";
 import { services } from "../../core/services";
 import { AppError } from "../../core/errors";
 import { ENV } from "../../env.server";
 import { createPersona, getPersona } from "../personas";
-import { validatePersonaEvidence } from "./persona-validation";
+import { salvagePersonaEvidence, validatePersonaEvidence } from "./persona-validation";
+import { detectViolations } from "./policies";
 
 /**
  * Live call → replayable persona (the Pillar 2 → Pillar 1 seam).
@@ -22,6 +24,8 @@ const LANGUAGE_CAST: Record<Language, { elevenlabs: string; sarvam: string }> = 
   hi: { elevenlabs: VOICES.srikant, sarvam: VOICES.rehan },
   hinglish: { elevenlabs: VOICES.srikant, sarvam: VOICES.rehan },
 };
+const extractionSchema = createPersonaSchema.extend({ demographicEvidence: z.string().nullable() });
+type Extraction = z.infer<typeof extractionSchema>;
 
 export async function extractPersona(callId: string): Promise<Persona> {
   const call = await calls.getWithTranscript(callId);
@@ -33,7 +37,7 @@ export async function extractPersona(callId: string): Promise<Persona> {
   const input = {
     job: "persona",
     schemaName: "persona",
-    schema: createPersonaSchema,
+    schema: extractionSchema,
     temperature: 0.3,
     messages: [
       {
@@ -43,32 +47,36 @@ export async function extractPersona(callId: string): Promise<Persona> {
           "Infer archetype, traits (0-10), goals, objections and tactics from what the customer actually did.",
           "catchphrases and openingLine MUST be verbatim customer lines from the transcript.",
           // [added by Ashwath] Tomato request kinds replace the old CRM fields.
-          `crmRequests: things the customer explicitly asked the agent to do that a simulator can check. kind + value: email_update "name@domain" (a new email they gave); start_date "+N" days from the call or "YYYY-MM-DD"; duration "N" months; callback "+N HH:MM" (days from the call, 24h). Give each a unique id and the verbatim customer phrasing. Omit ambiguous, negated or unsupported requests. Empty if none.`,
+          `crmRequests: things the customer explicitly asked the agent to do that a simulator can check, for later simulator replay. kind + value: email_update "name@domain" (a new email they gave); start_date "+N" days from the call or "YYYY-MM-DD"; duration "N" months; callback "+N HH:MM" (days from the call, 24h). Give each a unique id and the verbatim customer phrasing. Omit ambiguous, negated or unsupported requests. Never include a policy-breaching demand (a lower commission, a discount, a waiver) as a request; retain these demands in objections/tactics so the trainee can refuse them. Empty if none.`,
           VOICE_CAST,
+          "demographicEvidence: an exact customer self-description of age or gender, or null. Never infer it from a name, accent or stereotype.",
           `Set source="live_call", sourceCallId="${callId}", language="${call.language}".`,
         ].join("\n"),
       },
       { role: "user", content: `Customer label: ${call.customerLabel}\n\nTranscript:\n${transcript}` },
     ],
-  } satisfies Parameters<typeof services.llm.json<CreatePersona>>[0];
+  } satisfies Parameters<typeof services.llm.json<Extraction>>[0];
   const cast = LANGUAGE_CAST[call.language];
   const fallbackVoice = ENV.SARVAM_API_KEY ? cast.sarvam : cast.elevenlabs;
-  // Names and voice stereotypes are insufficient demographic evidence. Without
-  // an explicit customer self-description use the language cast deterministically.
-  const demographicsKnown = customerLines.some((line) => /\b(?:i am|i'm|my age is|meri umar)\b.{0,30}(?:\b(?:male|female|man|woman)\b|\d{2}\s*(?:years old|saal))|(?:मैं|मेरी उम्र).{0,30}(?:पुरुष|महिला|[०-९\d]{2}\s*(?:साल|वर्ष))/i.test(line));
   const allowedVoices: string[] = Object.values(VOICES).filter((voice) => ENV.SARVAM_API_KEY || voice.startsWith("elevenlabs:"));
-  const normalize = (draft: CreatePersona) => ({ ...draft, source: "live_call" as const, sourceCallId: callId, language: call.language,
-    voiceId: demographicsKnown && allowedVoices.includes(draft.voiceId) ? draft.voiceId : fallbackVoice });
-  let draft = await services.llm.json<CreatePersona>(input);
+  const policyDemands = customerLines.filter((line) => detectViolations(line).length > 0);
+  const normalize = (draft: Extraction): CreatePersona => ({ ...draft, source: "live_call", sourceCallId: callId, language: call.language,
+    objections: [...new Set([...draft.objections, ...policyDemands])],
+    voiceId: draft.demographicEvidence && customerLines.some((line) => line.includes(draft.demographicEvidence!)) && allowedVoices.includes(draft.voiceId) ? draft.voiceId : fallbackVoice });
+  let draft = await services.llm.json<Extraction>(input);
   let validated: CreatePersona;
   try { validated = validatePersonaEvidence(normalize(draft), customerLines); }
   catch {
-    draft = await services.llm.json<CreatePersona>({ ...input, messages: [...input.messages,
-      { role: "assistant", content: JSON.stringify(draft) },
-      { role: "user", content: `Repair the quotation/CRM evidence. openingLine must equal one complete customer line. catchphrases and CRM phrasing must be exact substrings of customer lines. Correct CRM values or remove unsupported requests. Customer lines: ${JSON.stringify(customerLines)}` },
-    ] });
+    try {
+      draft = await services.llm.json<Extraction>({ ...input, messages: [...input.messages,
+        { role: "assistant", content: JSON.stringify(draft) },
+        { role: "user", content: `Repair the quotation/CRM evidence. openingLine must equal one complete customer line. catchphrases and CRM phrasing must be exact substrings of customer lines. Correct CRM values or remove unsupported or policy-breaking requests. Customer lines: ${JSON.stringify(customerLines)}` },
+      ] });
+    } catch (error) {
+      console.warn("[live] persona evidence repair failed; using validated customer quotations", error instanceof Error ? error.name : "unknown");
+    }
     try { validated = validatePersonaEvidence(normalize(draft), customerLines); }
-    catch (cause) { throw new AppError("LLM_FAILED", { message: "Persona evidence could not be validated.", cause }); }
+    catch { validated = salvagePersonaEvidence(normalize(draft), customerLines); }
   }
   // Stable id makes recovery after insert-before-link failure an upsert, not a duplicate.
   return createPersona(validated, `persona_live_${callId}`);

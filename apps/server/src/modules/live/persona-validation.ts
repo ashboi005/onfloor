@@ -1,4 +1,5 @@
 import { createPersonaSchema, type CreatePersona, type CrmRequest } from "@onfloor/contracts";
+import { detectViolations } from "./policies";
 
 /*
  * [added by Ashwath] The simulator's requests are now Tomato asks (new email, start date, duration,
@@ -15,6 +16,8 @@ const NUMBER_WORDS: Record<string, number> = { one: 1, ek: 1, two: 2, do: 2, thr
 
 /** Conservative extraction: ambiguous asks are omitted, never guessed. */
 function supportsValue(request: CrmRequest): boolean {
+  // The simulator must never reward an agent for granting an unlawful demand.
+  if (detectViolations(request.phrasing).length) return false;
   const text = request.phrasing.toLowerCase();
   switch (request.kind) {
     case "email_update":
@@ -47,4 +50,21 @@ export function validatePersonaEvidence(draft: CreatePersona, customerLines: str
     ids.add(request.id);
   }
   return { ...persona, crmRequests: persona.crmRequests.filter(supportsValue) };
+}
+
+/** Keep sound evidence when the model fails to repair only some quotations. */
+export function salvagePersonaEvidence(draft: CreatePersona, customerLines: string[]): CreatePersona {
+  const openingLine = customerLines.includes(draft.openingLine) ? draft.openingLine : customerLines[0];
+  if (!openingLine) throw new Error("No customer speech is available.");
+  const catchphrases = draft.speechStyle.catchphrases.filter((phrase) =>
+    phrase.trim() && customerLines.some((line) => line.includes(phrase)));
+  const seen = new Set<string>();
+  const crmRequests = draft.crmRequests.filter((request) => {
+    // [added by Ashwath] VALUE_FORMAT replaces the old crmStateSchema field check.
+    if (seen.has(request.id) || !VALUE_FORMAT[request.kind]?.test(request.value) ||
+      !customerLines.some((line) => line.includes(request.phrasing)) || !supportsValue(request)) return false;
+    seen.add(request.id);
+    return true;
+  });
+  return createPersonaSchema.parse({ ...draft, openingLine, speechStyle: { ...draft.speechStyle, catchphrases }, crmRequests });
 }

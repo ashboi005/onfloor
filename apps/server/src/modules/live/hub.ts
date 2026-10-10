@@ -37,7 +37,11 @@ export const hub = {
   },
 
   emit(callId: string, event: LiveEvent) {
-    liveEventSchema.parse(event);
+    const parsed = liveEventSchema.safeParse(event);
+    if (!parsed.success) {
+      console.error("[live] dropped invalid event", callId, parsed.error.issues);
+      return;
+    }
     backlog.get(callId)?.push(event);
     for (const key of [callId, ...(callId === activeCallId ? ["active"] : [])]) {
       for (const sub of subscribers.get(key) ?? []) {

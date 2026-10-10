@@ -1,4 +1,4 @@
-import { type CreatePersona, type CrmRequest, createPersonaSchema, type Persona, personaSchema, type PersonaSource } from "@onfloor/contracts";
+import { type CreatePersona, type CrmRequest, createPersonaSchema, PERSONA_SOURCES, type Persona, personaSchema, type PersonaSource } from "@onfloor/contracts";
 import { personas } from "@onfloor/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { AppError } from "../../core/errors";
@@ -11,7 +11,14 @@ import { db } from "../../services";
  */
 
 type Row = typeof personas.$inferSelect;
-const toPersona = (r: Row): Persona => ({ ...r.body, id: r.id, createdAt: r.createdAt.toISOString() });
+const toPersona = (r: Row): Persona => {
+  // Older databases used values such as "fixture" for seeded personas. Keep the API compatible
+  // with those rows (unknown → seed) while the next seed run repairs the columns.
+  const known = (v: unknown): v is PersonaSource => (PERSONA_SOURCES as readonly unknown[]).includes(v);
+  const source = known(r.source) ? r.source : known(r.body.source) ? r.body.source : "seed";
+  return { ...r.body, id: r.id, source, createdAt: r.createdAt.toISOString() };
+};
+};
 
 /**
  * Coerce request values onto the formats the tools audit expects (LLM extraction says
@@ -55,7 +62,14 @@ export async function createPersona(input: CreatePersona, id?: string): Promise<
     })
     .onConflictDoUpdate({
       target: personas.id,
-      set: { name: body.name, archetype: body.archetype, language: body.language, body },
+      set: {
+        name: body.name,
+        archetype: body.archetype,
+        language: body.language,
+        source: body.source,
+        sourceCallId: body.sourceCallId,
+        body,
+      },
     })
     .returning();
   return toPersona(row!);
