@@ -1,7 +1,7 @@
 # OnFloor demo foundation: context, proposal, and questions to answer
 
-**For:** Mansukh (answers) · **Then:** Ashwath (contracts, RAG, engine, scoring), Harnoor (CRM UI),
-Tushar (live dashboard)
+**For:** Mansukh (answers) · **Then:** Ashwath (contracts, RAG, engine, scoring), Harnoor (CRM UI +
+live dashboard UI), Tushar (live event stream, Telegram)
 **Status:** awaiting answers · 2026-10-10
 
 ## How to use this doc
@@ -378,7 +378,8 @@ Answer:
 | Knowledge docs content | Mansukh | Q5–Q7, Q17 |
 | Ingest the new docs; wipe old knowledge/memories | Ashwath | Q17 |
 | CRM UI rebuild (Account / Deal / Activity, price summary, approval flow) | Harnoor | Q13, Q14 |
-| HUD Account card (+ Deal form if Q12 = yes); Telegram caller → account mapping | Tushar (+ Ashwath for the live CRM audit) | Q12, Q19 |
+| HUD Account card (+ Deal form if Q12 = yes) | Harnoor | Q12 |
+| Telegram caller → account mapping; account context in the copilot | Tushar (+ Ashwath for the live CRM audit) | Q12, Q19 |
 | Landing page + article reflect Layer 1 / Layer 2 | Mansukh | Q1–Q3, Q22 |
 | Demo rehearsal script (stage directions) | Mansukh + all | Q21 |
 

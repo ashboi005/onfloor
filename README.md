@@ -47,7 +47,7 @@ WebSockets and runs them through the real DB → scoring → persona path. `POST
 | `apps/telegram-bridge` | Python py-tgcalls bridge | Tushar |
 | `apps/web/src/lib/api`, `apps/web/src/hooks` | Data client (mock + http), `useSimCall`, `useLiveCall` | Ashwath |
 | `apps/web/src/app/(app)/simulator`, `components/sim` | Simulator picker + workspace | Harnoor |
-| `apps/web/src/app/(app)/live`, `components/hud` | Live call dashboard (HUD) | Tushar |
+| `apps/web/src/app/(app)/live`, `components/hud` | Live call dashboard (HUD) | Harnoor |
 | `apps/web/src/app/(marketing)`, `(app)/{calls,personas}`, `/design`, `components/{shell,report}` | Landing, shell, scorecard, personas | Mansukh |
 | `docs/article` | The OnFloor article | Mansukh |
 

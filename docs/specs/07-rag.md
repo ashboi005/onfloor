@@ -1,8 +1,8 @@
 # OnFloor: Knowledge & RAG
 
 Owner: **Ashwath** (store, ingestion, simulator + scoring integration).
-Touches: **Tushar** (copilot grounding, already-wired customer memory, and the HUD's "Last time…" card
-and hint source chips, since he owns the live dashboard). Mansukh: nothing required (an optional manager "Knowledge" page is possible, the
+Touches: **Tushar** (copilot grounding, already-wired customer memory) and **Harnoor** (the HUD's
+"Last time…" card and hint source chips). Mansukh: nothing required (an optional manager "Knowledge" page is possible, the
 API and hooks exist).
 
 ## 1. What it does

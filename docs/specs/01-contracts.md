@@ -275,7 +275,7 @@ Server → client:
 
 ## 10. Live HUD WebSocket `/ws/live/:callId` (Tushar → HUD)
 
-**The HUD (Tushar's, since 2026-10-10) uses `useLiveCall(callId)`.** Tushar's server emits exactly these:
+**Harnoor's HUD uses `useLiveCall(callId)`.** Tushar's server emits exactly these:
 
 ```ts
 { type: "call_started", call: Call }
@@ -308,6 +308,6 @@ Server → client:
 | `personas.ts` | 3 seed personas (impatient, price_squeezer, skeptic) + 1 `live_call` persona | everyone |
 | `scenarios.ts` | "Skeptical Restaurant Owner" scenario with policies + initial CRM | Harnoor, Ashwath |
 | `sim-call.ts` | Scripted `/ws/sim` server event timeline (~90s) incl. 2 `crm_request`s | Harnoor (mock `useSimCall`) |
-| `live-call.ts` | Scripted `/ws/live` event timeline (~2 min) with hints, a critical guardrail, sentiment swings, dead-air alert, ending in `scorecard_ready` + `persona_ready` | Tushar (mock `useLiveCall` for his HUD + target output for his server) |
+| `live-call.ts` | Scripted `/ws/live` event timeline (~2 min) with hints, a critical guardrail, sentiment swings, dead-air alert, ending in `scorecard_ready` + `persona_ready` | Harnoor (mock `useLiveCall`), Tushar (target output) |
 | `scorecards.ts` | One sim scorecard (with CRM audit) and one live scorecard | Mansukh |
 | `calls.ts` | ~6 calls of mixed kind/status for lists | Mansukh |

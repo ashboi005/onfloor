@@ -174,7 +174,7 @@ prompt, customer memory at live-call start, automatic write-back after scoring. 
 | To | What | By |
 |---|---|---|
 | All | Repo, contracts, fixtures, `.env.example`, shared DB URL | H+1.5 |
-| Harnoor / Tushar | `useSimCall` (Harnoor), `useLiveCall` (Tushar's HUD) mock mode, `lib/api` mock | H+2 |
+| Harnoor | `useSimCall`, `useLiveCall` mock mode, `lib/api` mock | H+2 |
 | Mansukh | `useScorecard`, `useCalls`, `usePersonas` mock | H+2 |
 | Tushar | API skeleton, `services.llm`/`stt` real, stubs for `createPersona`/`scoreCall`/`calls` | H+3 |
 | Tushar | Real `scoreCall`, `createPersona` | H+12 |

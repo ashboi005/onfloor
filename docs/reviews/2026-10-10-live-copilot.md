@@ -126,7 +126,7 @@ falling back to the first customer line for `openingLine`) instead of failing th
 
 Recorded as decisions in `03-tushar-live.md`: **Q1** policy-breaching demands are never CRM requests
 (they become objections/tactics); **Q2** AI hints as fast as possible, several on screen at once (no
-fixed deadline); **Q3** one agent per bridge is fine. The live dashboard UI is also now Tushar's.
+fixed deadline); **Q3** one agent per bridge is fine. The live dashboard UI stays with Harnoor; Tushar owns its event stream.
 
 Original questions:
 

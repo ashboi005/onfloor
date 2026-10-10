@@ -1,6 +1,6 @@
 "use client";
 
-/** Live call dashboard (HUD). OWNER: Tushar since 2026-10-10 (built by Harnoor). Spec: docs/specs/03-tushar-live.md §7. */
+/** Live call dashboard (HUD). OWNER: Harnoor. Spec: docs/specs/04-harnoor-frontend.md (Screen 3). Events: Tushar. */
 
 import type { Route } from "next";
 import Link from "next/link";

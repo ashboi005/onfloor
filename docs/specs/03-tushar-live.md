@@ -1,14 +1,13 @@
-# Spec: Live "Shadow AI" Copilot: backend + dashboard (Tushar)
+# Spec: Live "Shadow AI" Copilot Backend (Tushar)
 
-You own Pillar 2 **end to end**: getting call audio out of Telegram, turning it into a
-speaker-labelled transcript, running the copilot brain, storing the call, **extracting a
-persona** that Pillar 1 can replay, and (since 2026-10-10) **the live call dashboard UI** itself (§7).
+You own Pillar 2 on the backend: getting call audio out of Telegram, turning it into a
+speaker-labelled transcript, running the copilot brain that drives the HUD, storing the call,
+and **extracting a persona** that Pillar 1 can replay. The dashboard UI itself is Harnoor's (§7).
 
-Your folders: `apps/telegram-bridge/` (Python), `apps/server/src/modules/live/` (TS),
-`apps/web/src/app/(app)/live/` and `apps/web/src/components/hud/` (Next.js).
+Your folders: `apps/telegram-bridge/` (Python) and `apps/server/src/modules/live/` (TS).
 Your output contract: the `/ws/live` events in `01-contracts.md §10`, consumed in the browser only
-through `useLiveCall()` (Ashwath's hook). `fixtures/live-call.ts` is the reference stream: the mock
-HUD runs on it, and your real stream should look like it.
+through `useLiveCall()` (Ashwath's hook). `fixtures/live-call.ts` is the reference stream: Harnoor's
+HUD runs on it in mock mode, and your real stream should look like it.
 
 Review of your first branch, with measurements: `docs/reviews/2026-10-10-live-copilot.md`.
 
@@ -27,7 +26,8 @@ These answer the review's open questions and override anything older in this spe
    `objections`/`tactics` instead, so the replayed persona still *pushes* for it and the agent is
    scored on refusing it.
 3. **One agent per bridge (`LIVE_AGENT_EMAIL`) is fine** for the demo. No multi-agent work.
-4. **You own the live dashboard frontend** (§7, moved from Harnoor's spec).
+4. **The live dashboard UI is Harnoor's** (it briefly moved to you, then back the same day). You own the
+   event stream it renders; §7 lists what each HUD element needs from you.
 
 ## 0. Spike first (H0–3, go/no-go)
 
@@ -170,79 +170,23 @@ HUD with no Telegram and no network luck. Record 2 good demo calls by H+16 and k
 `GET /api/live/active`, `WS /ws/live/:callId` (also accept `active` to attach to whichever
 call is live), `POST /api/live/calls/replay-file`, `WS /internal/live/ingest`.
 
-## 7. Live dashboard frontend `/live` (moved from Harnoor, 2026-10-10)
+## 7. The live dashboard (owned by Harnoor)
 
-Rules (same as every frontend owner): **no `fetch`/`WebSocket` in UI code.** The page talks only to
-`useLiveCall("active" | callId)` from `@/hooks/use-live-call` (owner: Ashwath; ask for anything it
-doesn't expose). Types come from `@onfloor/contracts`; UI primitives come from `packages/ui` (Mansukh).
-**You're not starting from scratch.** Harnoor already built the dashboard before the hand-over (merged on
-`main`). Take it over and finish it:
+The `/live` UI is **Harnoor's** (`04-harnoor-frontend.md` Screen 3, decision 2026-10-10). You own
+everything it renders: the `/ws/live` event stream, consumed in the browser only through
+`useLiveCall()`. For the dashboard to be right, your stream has to deliver:
 
-| File | Component | State |
+| HUD element | Your events | Open review item |
 |---|---|---|
-| `app/(app)/live/page.tsx` | the dashboard page, `useLiveCall("active")`, dev "Simulate a call" | ✅ built |
-| `components/hud/customer-memory.tsx` | `CustomerMemory`: "Last time…" card | ✅ built |
-| `components/hud/hint-stack.tsx` | `HintStack`: primary hint + source chips (📘) | 🟡 older hints are **collapsed** behind a toggle. Decision 1 wants several hints **visible** at once, each with its own countdown |
-| `components/hud/guardrail-banner.tsx` | `GuardrailBanner` | ✅ built |
-| `components/hud/sentiment-radar.tsx` | `SentimentRadar` + `recommendation()` | ✅ built (it will only move once the copilot LLM path works: review C1) |
-| `components/hud/talk-metrics.tsx` | `TalkMetrics` | ✅ built (alerts depend on review C3/C4) |
-| `components/hud/mini-transcript.tsx` | `MiniTranscript` | 🟡 add the **Original \| English** subtitle toggle (below) | `NEXT_PUBLIC_USE_MOCKS=true` replays `fixtures/live-call.ts`,
-so you can build it without a running call.
+| Hint stack (several at once) | `hint` (keyword + AI, with `sources`) | C1: the AI hints never arrive |
+| Guardrail banner | `guardrail` on partials + finals | C2: the mixed-script activation miss |
+| Sentiment radar | `sentiment` after each customer turn | C1: the AI path times out, so the gauges never move |
+| Talk metrics | `talk_metrics` every second | C3: early monologue alarm; C4: dead air undercounted |
+| Customer memory card | `customer_memory` after `call_started` | C5: WAV replay has no customer identity |
+| Mini transcript + subtitles | `transcript_partial` / `transcript_final` / `transcript_translation` | (subtitles already wired: 3 lines in your `session.ts`, marked `[added by Ashwath]`; keep them) |
+| After-call cards | `call_ended`, `scorecard_ready`, `persona_ready` | C6: persona extraction can hard-fail |
 
-The agent keeps this open on a second monitor (or half the screen) while on the Telegram
-call. It auto-attaches with `useLiveCall("active")`.
-
-- **Waiting state:** "Waiting for a call on the OnFloor line…", with a pulsing indicator.
-- **Top strip:** customer name, call timer, language, connection dot.
-- **Customer memory card ("Last time…")** (new, RAG): `live.customerMemory` is a list of
-  `{ text, source, at }` from earlier calls with this customer. It arrives ~1s after the call
-  starts. Show it as a compact card near the customer name: date (`at`) + text, max 3 items,
-  collapsible. With `[]` show "First call with this customer" (or nothing). It's in the mock
-  timeline already (2 items for Suresh), so you can build it now.
-- **Sentiment radar:** three gauges (patience, frustration, engagement) + a small sparkline
-  from `sentiment.history`. One recommendation word derived on the client:
-  `frustration > 65` → "DE-ESCALATE", `engagement > 70 && patience > 50` → "CLOSE",
-  else "DISCOVER".
-- **Hint stack (centre, biggest):** **several hints can be live at once** (Decision 1). Newest
-  on top as the large card (kind icon, title, body), the others stacked below it, each with its own
-  `ttlMs` countdown bar and pin/dismiss buttons. AI hints may arrive a few seconds after the keyword
-  hint for the same turn, so both can show. If `hint.sources` is set (RAG: the hint was grounded in
-  the playbook), show it as a small chip under the body, e.g. "📘 OnFloor Ads playbook ›
-  Competitor facts". It tells the agent the number is safe to quote.
-- **Guardrail banner:** `critical` = full-width red banner + a short audio blip, sticky
-  until dismissed. `warn` = amber toast. These must be impossible to miss.
-- **Talk metrics:** talk-ratio bar (agent vs customer), silence counter that turns
-  amber at 4s and fires a "Say something — dead air" nudge on `alert: "dead_air"`.
-  `monologue` → "Pause and ask a question".
-- **Mini transcript** (right rail): last ~6 turns + partials, speaker colours, with the
-  **Original | English** subtitle toggle:
-
-  **Subtitles (raw ↔ English).** Every transcript turn has an optional `turn.translation`: the
-  English version. It's the same as the text for English calls; for Hindi/Hinglish it arrives **1–2.5s
-  after the turn** (Merge, never Gemini) and the hook merges it in automatically. Use the shared helper so
-  every screen behaves the same and the choice is remembered:
-  
-  ```ts
-  import { subtitleText, useSubtitleMode } from "@/lib/subtitles";
-  const [mode, setMode] = useSubtitleMode();            // "raw" | "english" (saved per browser)
-  const { text, pending } = subtitleText(turn, mode);   // pending = English not here yet
-  ```
-  
-  Put a small toggle (`Original | English`) above the transcript. In English mode show `pending` lines in
-  their raw text, dimmed, with a "translating…" hint, then swap in place when the subtitle lands (no layout
-  jump). Live partials are always raw (they're never translated). Mock mode has delayed subtitles in the
-  timeline, so you can build this now.
-
-  Server side this already works for live calls: `appendLiveTurn()` fires `translateTurn()` and emits
-  `transcript_translation` (3 lines added by Ashwath in your `session.ts`, marked `[added by Ashwath]`;
-  keep them if you refactor). Translations are also saved, so `GET /api/calls/:id` returns them.
-- **After the call:** "Scoring…" → when `scorecardReady`, a "View scorecard" button
-  (`/calls/[id]`). When `personaId` arrives, a celebratory card: "Persona created from
-  this call → Replay in simulator" (`/simulator/new?replay=<callId>`). This is demo
-  beat 4, so make it look good.
-
-Make the HUD legible at a glance. Big type, few words, colour carries meaning. Nobody
-reads paragraphs while they're on a call.
+Coordinate the look with Harnoor; test your stream against his page with `NEXT_PUBLIC_USE_MOCKS=false`.
 
 ## What you get from Ashwath (and when)
 
@@ -261,7 +205,7 @@ reads paragraphs while they're on a call.
 | To | What | By |
 |---|---|---|
 | Everyone | Spike result (go / plan B / plan C) | H+3 |
-| Your HUD (§7) | `/ws/live` emitting real events for at least transcript + sentiment | H+12 |
+| Harnoor (HUD) | `/ws/live` emitting real events for at least transcript + sentiment | H+12 |
 | Ashwath | Default live policy list | H+8 |
 | All | 2 recorded demo calls + working replay-file path | H+16 |
 
