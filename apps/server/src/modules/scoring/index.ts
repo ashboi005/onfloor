@@ -134,7 +134,11 @@ Return JSON:
 - moments: the 2-6 moments that decided the call, each tied to ONE turn id. severity mistake|warning|good. title under 8 words (e.g. "Offered unapproved 15% discount"). detail one sentence. goldenLine = the exact words a top rep would have said instead (in the language the call was in), or null for "good" moments.
 Use only turn ids that appear below.
 
-# ACCURACY RULES
+${
+    input.kind === "live"
+      ? `# LIVE CALL: NO CRM\nThis was a real call; the agent had no CRM open. If the customer asked for an account change, a clear verbal acknowledgement ("sure, I'll do that") is the correct handling. Never mark it as ignored or not actioned. Only judge what was said.\n\n`
+      : ""
+  }# ACCURACY RULES
 - Only flag a policy breach if the AGENT's own words in that turn breach it. Quote the number or promise in the detail (e.g. "offered 15%", "promised activation tomorrow"). What the customer demanded is not the agent's breach.
 - Offering a discount within the allowed limit is NOT a breach.
 - Never produce two moments that contradict each other.

@@ -219,7 +219,7 @@ the account facts in the CRM must match each persona's backstory.
 | Screen | Who | Shows | CRM relation |
 |---|---|---|---|
 | **Simulator workspace** | trainee | CRM (Account/Deal/Activity) + call panel (voice, transcript, subtitles, patience) | full CRM, every action audited |
-| **Live call dashboard (HUD)** | agent on a real Telegram call | hints, guardrails, sentiment, talk metrics, customer memory, subtitles, + an **Account card** (read-only summary of the caller's CRM account) | reads the account; see Q12 for whether it also gets the Deal form |
+| **Live call dashboard (HUD)** | agent on a real Telegram call | hints, guardrails, sentiment, talk metrics, customer memory, subtitles | **none**: no CRM on live calls (Q12 answered) |
 | **Calls / Scorecard / Personas** | manager, QA | scores, moments, golden lines, CRM audit, replayable personas | reads the CRM audit |
 
 ### 4.10 How it all fits ★
@@ -230,7 +230,7 @@ trainee picks account+persona(+tuning)            customer calls the Zaika line
   → AI customer (persona + account facts            → bridge → per-channel STT
      + agent's weak spots)                          → copilot (playbook + account + customer memory)
   ↔ trainee talks + works the CRM                     → HUD: hints · guardrails · sentiment · subtitles
-  → crm_actions tracked                             → agent talks (+ CRM, if Q12 = yes)
+  → crm_actions tracked                             → agent talks (no CRM on live calls)
   → hang-up                                         → hang-up
         └──────────────► scoring (transcript + CRM audit + policies + playbook facts) ◄──────────┘
                          → scorecard → memory/weak spots/golden lines into RAG
@@ -317,7 +317,9 @@ Answer:
 **Q12 🔴 On a live Telegram call, does the agent also use the CRM?** ★ **Yes, read + Deal form**, so the
 copilot can notice "customer asked to change the budget, not done in the CRM" and the live scorecard gets
 a CRM audit. Alternative: the HUD shows a read-only Account card only (simpler; live calls have no CRM audit).
-Answer:
+Answer: ✅ **No (Ashwath, 2026-10-10).** The CRM exists only in the simulator. On a live call there's no CRM,
+no Account card and no CRM audit. The customer may still ask for account changes; the agent just
+acknowledges them ("sure sir, will do"), nothing is highlighted, and nothing is scored for it.
 
 **Q13 🔴 CRM structure:** accept §4.5 ★ (Account / Deal / Activity, the action list, the removed fields),
 or edit. Anything a real partner-growth rep would expect that's missing?
@@ -349,7 +351,8 @@ Answer:
 **Q19 How does a Telegram caller map to a CRM account?** ★ A small lookup table (Telegram user id →
 account id) for the demo phones; an unknown caller shows "Unknown caller: create account?" Alternatively,
 everyone on the demo is "Suresh @ Patil Misal".
-Answer:
+Answer: ✅ **No mapping (Ashwath, 2026-10-10).** Telegram callers aren't linked to CRM accounts. (Customer
+*memory* still works: it's keyed on the Telegram user id, which has nothing to do with the CRM.)
 
 **Q20 Who plays the live customer on stage, and in which language?** ★ A teammate on a second phone, in
 Hinglish, with the WAV replay as the fallback.
@@ -378,8 +381,7 @@ Answer:
 | Knowledge docs content | Mansukh | Q5–Q7, Q17 |
 | Ingest the new docs; wipe old knowledge/memories | Ashwath | Q17 |
 | CRM UI rebuild (Account / Deal / Activity, price summary, approval flow) | Harnoor | Q13, Q14 |
-| HUD Account card (+ Deal form if Q12 = yes) | Harnoor | Q12 |
-| Telegram caller → account mapping; account context in the copilot | Tushar (+ Ashwath for the live CRM audit) | Q12, Q19 |
+| ~~HUD Account card / caller → account mapping~~ | (dropped: Q12, Q19 = no) | |
 | Landing page + article reflect Layer 1 / Layer 2 | Mansukh | Q1–Q3, Q22 |
 | Demo rehearsal script (stage directions) | Mansukh + all | Q21 |
 

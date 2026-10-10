@@ -99,6 +99,10 @@ The page talks only to `useLiveCall("active" | callId)` from `@/hooks/use-live-c
 event stream behind it is Tushar's (`01-contracts.md` §10, `03-tushar-live.md`); `NEXT_PUBLIC_USE_MOCKS=true`
 replays `fixtures/live-call.ts`, so you can build it without a running call.
 
+**No CRM on this screen** (decision 2026-10-10): live calls have no CRM, no account card and no
+highlighting of account-change requests; the agent just acknowledges them. The CRM lives only in the
+simulator.
+
 You already built most of it (merged on `main`). What's left, per component:
 
 | File | Component | State |

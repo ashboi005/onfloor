@@ -28,6 +28,10 @@ These answer the review's open questions and override anything older in this spe
 3. **One agent per bridge (`LIVE_AGENT_EMAIL`) is fine** for the demo. No multi-agent work.
 4. **The live dashboard UI is Harnoor's** (it briefly moved to you, then back the same day). You own the
    event stream it renders; §7 lists what each HUD element needs from you.
+5. **No CRM on live calls, and no Telegram caller → CRM account mapping.** The CRM exists only in the
+   simulator. A live customer may still ask for account changes. The agent just acknowledges them, and
+   neither the HUD nor the copilot highlights them (don't add hints like "update the CRM"). The live
+   scorecard doesn't penalise it either (Ashwath's judge already knows live calls have no CRM).
 
 ## 0. Spike first (H0–3, go/no-go)
 
@@ -144,7 +148,9 @@ On `call_ended`:
    - `catchphrases` and `openingLine` are **verbatim** customer lines (the replay
      sounds like them because of these).
    - `crmRequests`: the account changes the customer asked for, mapped onto `CRM_FIELDS`
-     (empty is fine). **Only changes an agent may legitimately make** (Decision 2): a demand that
+     (empty is fine). **This is only for the simulator replay** (Decision 5): the CRM isn't used on the
+     live call, but when this persona is replayed in the simulator, it asks the trainee for the same
+     changes and the trainee does them in the CRM there. **Only changes an agent may legitimately make** (Decision 2): a demand that
      breaches policy goes into `objections`/`tactics`, never into `crmRequests`.
    - `voiceId`: pick from a small cast table by language + inferred gender/age (no voice
      cloning for the MVP. Cloning from the recording is a stretch goal).
