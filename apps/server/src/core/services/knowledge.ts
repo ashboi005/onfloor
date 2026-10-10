@@ -60,6 +60,8 @@ export interface KnowledgeService {
   ingest(doc: KnowledgeDoc): Promise<{ chunks: number }>;
   remove(scope: KnowledgeScope, source: string): Promise<void>;
   sources(scope?: KnowledgeScope["kind"]): Promise<KnowledgeSource[]>;
+  /** Pay the cold start (connection, index check, first embedding) at boot, not on the first call. */
+  warmup(): Promise<void>;
 }
 
 /**
@@ -100,17 +102,34 @@ async function chunk(doc: KnowledgeDoc): Promise<string[]> {
   return chunks.map((c) => c.text.trim()).filter(Boolean);
 }
 
+/**
+ * The Qdrant client always uses port 6333 unless told otherwise, even for an https URL without a
+ * port. A hosted instance behind a reverse proxy (https://qdrant.example.com) listens on 443, so the
+ * port comes from the URL: explicit port → it; https → 443; else Qdrant's default 6333.
+ */
+function qdrantPort(url: string): number {
+  const u = new URL(url);
+  return u.port ? Number(u.port) : u.protocol === "https:" ? 443 : 6333;
+}
+
 class QdrantKnowledge implements KnowledgeService {
   readonly enabled = true;
   private readonly store = new QdrantVector({
     id: "onfloor-knowledge",
     url: ENV.VECTOR_DATABASE_URL!,
+    port: qdrantPort(ENV.VECTOR_DATABASE_URL!),
     ...(ENV.VECTOR_DATABASE_API_KEY && { apiKey: ENV.VECTOR_DATABASE_API_KEY }),
   });
   private readonly index = ENV.KNOWLEDGE_COLLECTION;
   private ready: Promise<void> | null = null;
 
   /** Creates the collection + payload indexes once (idempotent; also required on Qdrant Cloud). */
+  async warmup(): Promise<void> {
+    const t = Date.now();
+    await this.retrieve("warm up", { kind: "org_docs" }, 1);
+    console.log(`[knowledge] ready (${Date.now() - t}ms)`);
+  }
+
   private ensure(): Promise<void> {
     this.ready ??= (async () => {
       const existing = await this.store.listIndexes();
@@ -216,6 +235,7 @@ class DisabledKnowledge implements KnowledgeService {
   ingest = async () => ({ chunks: 0 });
   remove = async () => {};
   sources = async () => [];
+  warmup = async () => {};
 }
 
 export function createKnowledgeService(): KnowledgeService {

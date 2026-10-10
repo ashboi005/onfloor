@@ -26,9 +26,11 @@ const RETIRED_DOC_SOURCES = ["playbook"];
 
 /**
  * Hard ceiling on any RAG lookup. Callers sit on latency-sensitive paths (live call start,
- * copilot hints), and an unreachable Qdrant would otherwise hang on TCP timeouts.
+ * copilot hints), and an unreachable Qdrant would otherwise hang on TCP timeouts. 4s, not less:
+ * a hosted Qdrant behind a proxy measured ~0.5-1s per query plus ~0.6-1.2s per Gemini embedding;
+ * callers run lookups off the hot path (keyword hints and the persona never wait on them).
  */
-const RAG_TIMEOUT_MS = 2500;
+const RAG_TIMEOUT_MS = 4000;
 
 const safe = async <T>(fallback: T, run: () => Promise<T>, timeoutMs = RAG_TIMEOUT_MS): Promise<T> => {
   if (!services.knowledge.enabled) return fallback;

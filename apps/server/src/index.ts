@@ -82,6 +82,7 @@ const app = new Elysia({ websocket: { idleTimeout: 960 } })
   .use(knowledgeRoutes)
   .listen(ENV.PORT, () => {
     console.log(`OnFloor API on http://localhost:${ENV.PORT}  (stub engines: ${ENV.STUB_ENGINES})`);
+    void services.knowledge.warmup().catch((err) => console.error("[knowledge] warm-up failed:", (err as Error).message));
   });
 
 export type App = typeof app;
