@@ -4,8 +4,9 @@ version = "0.1.0"
 description = "Telegram private-call bridge for OnFloor (py-tgcalls). Owner: Tushar."
 requires-python = ">=3.12"
 dependencies = [
-  "py-tgcalls==3.0.0",
-  "pyrogram>=2.0.106",
+  # py-tgcalls' own [pyrogram] extra: pyrogrammod, a maintained Pyrogram fork (same `pyrogram`
+  # module). Upstream pyrogram 2.0.106 lacks errors py-tgcalls 3.0 imports (GroupcallForbidden).
+  "py-tgcalls[pyrogram]==3.0.0",
   "sounddevice>=0.5",
   "numpy>=1.26",
   "scipy>=1.11",
