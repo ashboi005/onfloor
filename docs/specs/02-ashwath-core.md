@@ -158,6 +158,11 @@ customer.
 personas (Impatient Decision-Maker, Price-Squeezer, High-Maintenance Skeptic) with voices
 cast in English/Hinglish (ElevenLabs) and at least one Sarvam Hindi voice.
 
+### D10. RAG (`07-rag.md`)
+Mastra + Qdrant (`VECTOR_DATABASE_URL`), Gemini embeddings via the key pool. Scopes: `org_docs`
+(playbook), `golden`, `agent`, `customer`. Wired: grounded judge, agent weak spots in the simulator
+prompt, customer memory at live-call start, automatic write-back after scoring. ✅ Done.
+
 ## What you hand to others, and when
 
 | To | What | By |

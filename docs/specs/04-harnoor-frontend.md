@@ -66,13 +66,20 @@ call. It auto-attaches with `useLiveCall("active")`.
 
 - **Waiting state:** "Waiting for a call on the OnFloor line…", with a pulsing indicator.
 - **Top strip:** customer name, call timer, language, connection dot.
+- **Customer memory card ("Last time…")** (new, RAG): `live.customerMemory` is a list of
+  `{ text, source, at }` from earlier calls with this customer. It arrives ~1s after the call
+  starts. Show it as a compact card near the customer name: date (`at`) + text, max 3 items,
+  collapsible. With `[]` show "First call with this customer" (or nothing). It's in the mock
+  timeline already (2 items for Suresh), so you can build it now.
 - **Sentiment radar:** three gauges (patience, frustration, engagement) + a small sparkline
   from `sentiment.history`. One recommendation word derived on the client:
   `frustration > 65` → "DE-ESCALATE", `engagement > 70 && patience > 50` → "CLOSE",
   else "DISCOVER".
 - **Hint stack (centre, biggest):** newest hint on top as a large card (kind icon, title,
   body). It auto-expires by `ttlMs` with a visible countdown bar. Pin/dismiss
-  buttons. Older hints collapse below.
+  buttons. Older hints collapse below. If `hint.sources` is set (RAG: the hint was grounded in
+  the playbook), show it as a small chip under the body, e.g. "📘 OnFloor Ads playbook ›
+  Competitor facts". It tells the agent the number is safe to quote.
 - **Guardrail banner:** `critical` = full-width red banner + a short audio blip, sticky
   until dismissed. `warn` = amber toast. These must be impossible to miss.
 - **Talk metrics:** talk-ratio bar (agent vs customer), silence counter that turns

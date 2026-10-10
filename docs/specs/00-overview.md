@@ -37,6 +37,7 @@ ask in chat. Shared files (`packages/contracts`) are Ashwath's.
 | LLM | `LLM_PROVIDER=merge\|gemini`: Merge Gateway (OpenAI-compatible) or Google Gemini. Can be overridden per job |
 | TTS | ElevenLabs (default) + Sarvam `bulbul:v3` (Indic voices). The persona's `voiceId` prefix picks the provider |
 | STT | ElevenLabs Scribe v2 Realtime (browser streams directly, token minted server-side). Sarvam STT for Indic where it's better |
+| Knowledge / RAG | Mastra + Qdrant (`VECTOR_DATABASE_URL`), Gemini embeddings. See `07-rag.md` |
 | Live call channel | Telegram (MTProto user-bot via a Python sidecar, see Tushar's spec) |
 | Languages | `en`, `hi`, `hinglish` |
 | Auth | Better Auth (email/password). Seeded demo accounts |
@@ -129,4 +130,4 @@ through the exact same transcription → copilot → HUD path. Tushar owns this.
   `NEXT_PUBLIC_` prefix.
 - No tests required. Run `bun run check-types` before you push.
 - If you're blocked for more than 20 minutes, say so in chat. Don't wait it out.
-- Ideas that don't fit the 24h (RAG personalisation etc.) go in `06-future-scope.md`, not into the build.
+- Ideas that don't fit the 24h go in `06-future-scope.md`, not into the build. (RAG graduated from there: `07-rag.md`.)

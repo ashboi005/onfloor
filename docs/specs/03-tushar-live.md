@@ -77,6 +77,40 @@ Persist every emitted event to `live_events` so the call can be re-shown after t
 Policies: use the scenario `policies` shape from contracts. Keep a default live policy
 list in `modules/live/policies.ts` and share it with Ashwath, because scoring uses the same list.
 
+### 3a. RAG: what's already wired, and what's yours
+
+Full design: `07-rag.md`. Short version for the live pillar:
+
+| | Status | What to do |
+|---|---|---|
+| **Customer memory at call start** | ✅ wired in `session.ts` `startLiveCall()`: emits `customer_memory` right after `call_started` | Make sure the bridge's `call_started` carries `customer.id` (it does, it becomes `externalCustomerId`). That id is the memory key, so keep it stable per Telegram user |
+| **Writing memory after the call** | ✅ automatic: `scoreCall()` → `rememberCall()` writes customer memory, agent mistakes and golden lines | Nothing. Just keep calling `scoreCall` in `finishLiveCall` |
+| **Grounded copilot hints** | 🔴 yours, in the LLM hint path (`copilot/index.ts`) | See below |
+| **Repeat-caller context in hints** | 🟡 optional | Pass `customerMemory(customerKey)` into the hint prompt too |
+
+Grounding the LLM hint (keep the keyword fast path as it is: it's instant and needs no RAG):
+
+```ts
+import { customerMemory, formatSnippets, groundingFacts, sourceTitles } from "../../knowledge";
+
+// on each customer final, in the LLM hint path:
+const [facts, memory] = await Promise.all([
+  groundingFacts(turn.text, 3),                         // playbook: prices, policies, counters
+  customerKey ? customerMemory(customerKey, turn.text, 2) : Promise.resolve([]),
+]);
+const prompt = `...existing prompt...
+APPROVED FACTS (quote numbers only from here):
+${formatSnippets(facts, 1200)}
+${memory.length ? `THIS CUSTOMER BEFORE:\n${formatSnippets(memory, 600)}` : ""}`;
+// …LLM call…
+hub.emit(callId, { type: "hint", hint: { ...hint, sources: sourceTitles(facts) } });
+```
+
+- The cost is one embedding call (~0.3–1s). Fire it as soon as the customer's **partial** stabilises,
+  not on the final, if you need the time back.
+- Every helper returns `[]` when RAG is off, so this code is safe with or without Qdrant.
+- `customerKey` = the call's `externalCustomerId` (keep it on your per-call state from `call_started`).
+
 ## 4. End of call → scorecard → persona
 
 On `call_ended`:
@@ -98,6 +132,9 @@ On `call_ended`:
 
 **That's the whole Pillar 1 seam.** Once a persona row exists with that shape, the
 simulator can replay it. Nothing else is needed from you.
+
+After `scoreCall`, the call is also written into the knowledge base automatically (customer memory
+for the next time this person calls, plus the agent's weak spots for the simulator). See §3a.
 
 ## 5. Demo fallback: `POST /api/live/calls/replay-file` (must have)
 
@@ -121,6 +158,7 @@ call is live), `POST /api/live/calls/replay-file`, `WS /internal/live/ingest`.
 | `calls` repo | `create, appendTurn, end, setPersona, setRecording, get` | H+3 |
 | `scoring.scoreCall(callId)` | stub returns fixture → real by H+12 | |
 | `personas.createPersona(input)` | real by H+3 (it's an insert) | |
+| Knowledge helpers (`modules/knowledge`) | `groundingFacts`, `customerMemory`, `customerMemoryEvent`, `formatSnippets`, `sourceTitles` (`07-rag.md` §5) | ✅ real |
 
 ## What you hand back
 

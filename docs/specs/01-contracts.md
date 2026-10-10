@@ -222,6 +222,11 @@ the `x-bridge-secret` header instead. In mock mode the web client fakes a signed
 | POST | `/calls/:id/replay` | Ashwath | → `SimSessionStart` (replays that call's extracted persona) |
 | GET | `/live/active` | Tushar | → `Call \| null` (the HUD auto-attaches to this) |
 | WS | `/ws/live/:callId` | Tushar | see §10 |
+| GET | `/knowledge/status` | Ashwath | → `{ enabled, collection, sources }` (RAG, see `07-rag.md`) |
+| GET | `/knowledge/docs` | Ashwath | → `KnowledgeSource[]` |
+| POST | `/knowledge/docs` | Ashwath (manager) | `CreateKnowledgeDoc` → `{ source, chunks }` |
+| DELETE | `/knowledge/docs/:source` | Ashwath (manager) | → `{ removed }` |
+| GET | `/knowledge/search` | Ashwath | `?q=&scope=&key=&k=` → `KnowledgeSnippet[]` |
 | POST | `/live/calls/replay-file` | Tushar | multipart audio → `{ callId }` (demo fallback) |
 
 ```ts
@@ -264,13 +269,15 @@ Server → client:
 
 ```ts
 { type: "call_started", call: Call }
+{ type: "customer_memory", customerLabel, items: { text, source, at }[] }   // RAG, right after call_started; [] = first call
 { type: "transcript_partial", speaker, text }        // in-flight, overwrite per speaker
 { type: "transcript_final", turn: TranscriptTurn }
 { type: "hint", hint: {
     id, kind: "pitch" | "objection" | "upsell" | "close",
     title,                        // "Commission pushback"
     body,                         // "Pivot to guaranteed reach: 12k diners/month in 5km"
-    triggerTurnId, ttlMs } }      // HUD hides it after ttlMs unless pinned
+    triggerTurnId, ttlMs,         // HUD hides it after ttlMs unless pinned
+    sources? } }                  // RAG: knowledge titles the hint was grounded in
 { type: "guardrail", alert: {
     id, severity: "warn" | "critical",
     policyId, message,            // "Don't promise next-day activation without approval"

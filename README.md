@@ -21,7 +21,8 @@ With mocks on, every page runs on `packages/contracts/fixtures`: the simulator p
 ```bash
 cp apps/server/.env.example apps/server/.env    # fill BETTER_AUTH_SECRET (openssl rand -base64 32)
 bun run db:start                                # local Postgres in Docker (or use the shared DB URL)
-bun run db:migrate && bun run db:seed           # tables + demo accounts, scenario, personas
+docker run -d --name onfloor-qdrant -p 6333:6333 -v onfloor_qdrant:/qdrant/storage qdrant/qdrant   # RAG (optional)
+bun run db:migrate && bun run db:seed           # tables + demo accounts, scenario, personas (+ playbook into Qdrant)
 bun run dev                                     # API :3000 + web :3001
 ```
 
@@ -55,6 +56,7 @@ WebSockets and runs them through the real DB → scoring → persona path. `POST
 |---|---|
 | Auth, DB (migrated + seeded on the shared DB), all REST routes, both WebSockets, live hub | ✅ real |
 | LLM toggle: Gemini + Merge (`zai/glm-5.3-flash`), per-job, Merge fallback | ✅ real. `bun run llm:check` |
+| RAG: Mastra + Qdrant. Playbook in `org_docs`, grounded judge, agent weak spots in the sim, customer memory on the HUD, write-back after scoring (`docs/specs/07-rag.md`) | ✅ real (needs `VECTOR_DATABASE_URL`; off = no-op) |
 | Gemini key rotation: up to 4 keys (`GEMINI_API_KEY`, `_2`…`_4`), round-robin per call, per-key-per-model cooldowns on 429/503/invalid | ✅ real. Key health in `GET /health` |
 | TTS: ElevenLabs + Sarvam by voiceId prefix | ✅ real |
 | Simulator engine: persona LLM, CRM requests, patience, dead air, barge-in, limits | ✅ real |
