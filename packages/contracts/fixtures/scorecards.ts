@@ -1,4 +1,5 @@
 import type { Scorecard } from "../src";
+import { thaliScorecard } from "./history";
 import { LIVE_CALL_ID, liveCallTranscript } from "./live-call";
 import { SIM_CALL_ID, simCallTranscript } from "./sim-call";
 
@@ -161,4 +162,4 @@ export const liveScorecard: Scorecard = {
   createdAt: "2026-10-10T09:01:20.000Z",
 };
 
-export const scorecards: Scorecard[] = [simScorecard, liveScorecard];
+export const scorecards: Scorecard[] = [simScorecard, liveScorecard, thaliScorecard];

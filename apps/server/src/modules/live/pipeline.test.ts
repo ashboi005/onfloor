@@ -45,7 +45,7 @@ mock.module("../../env.server", () => ({ ENV: { LIVE_DEFAULT_LANGUAGE: "hinglish
 mock.module("../../core/calls", () => ({ calls: {
   async create(input: Partial<Call>) {
     const call: Call = { id: `call_${crypto.randomUUID()}`, kind: "live", agentId: owner.id, language: "hinglish", status: "active",
-      customerLabel: "Test customer", scenarioId: null, personaId: null, replayOfCallId: null, startedAt: new Date().toISOString(),
+      customerLabel: "Test customer", scenarioId: null, personaId: null, merchantId: null, guidance: false, replayOfCallId: null, startedAt: new Date().toISOString(),
       endedAt: null, durationMs: null, recordingUrl: null, overallScore: null, ...input };
     rows.set(call.id, call); transcripts.set(call.id, []); return { ...call };
   },
@@ -62,6 +62,7 @@ mock.module("../../core/calls", () => ({ calls: {
   async end(id: string, status: Call["status"]) { if (failEnd) throw new Error("end write unavailable"); const call = rows.get(id)!; call.status = status; call.endedAt = new Date().toISOString(); call.durationMs = Date.now() - Date.parse(call.startedAt); return { ...call }; },
   async setPersona(id: string, personaId: string) { rows.get(id)!.personaId = personaId; },
   async setRecording(id: string, url: string) { rows.get(id)!.recordingUrl = url; },
+  async setTurnTranslation() {}, // [added by Ashwath] subtitles write-back (silences test noise)
 } }));
 mock.module("./index", () => ({
   async agentIdByEmail() { return owner.id; },
@@ -105,7 +106,8 @@ mock.module("../../core/services", () => ({ services: {
     const { suresh } = await import("@onfloor/contracts/fixtures");
     return input.schema.parse({ ...suresh, openingLine: "Please pause my campaign",
       speechStyle: { ...suresh.speechStyle, catchphrases: ["Please pause my campaign"] },
-      crmRequests: [{ id: "req_1", field: "campaignStatus", value: "paused", phrasing: "Please pause my campaign" }] });
+      crmRequests: [] }); // [added by Ashwath] "pause my campaign" is no longer a simulator request kind
+
   } },
 } }));
 mock.module("../../core/auth-guard", () => ({

@@ -1,17 +1,37 @@
 import type {
   Agent,
-  CrmAction,
+  Campaign,
   CrmRequest,
+  Disposition,
+  DispositionSuggestion,
+  GuidanceState,
+  Merchant,
   Persona,
   Scenario,
   SimClientMessage,
+  SimPhase,
   SimServerMessage,
   SimSessionStart,
   StartSim,
   TranscriptTurn,
+  WorkspaceAction,
+  WorkspaceResult,
 } from "@onfloor/contracts";
-import { applyPersonaTuning } from "@onfloor/contracts";
-import { SIM_CALL_ID, simCallTimeline } from "@onfloor/contracts/fixtures";
+import {
+  addMonths,
+  applyPersonaTuning,
+  callbackSlotSchema,
+  renderEmail,
+  resolveRequest,
+  startSimSchema,
+  toMerchantDashboard,
+  toMerchantSummary,
+  toNuggetTicket,
+  todayIst,
+  validateCampaign,
+} from "@onfloor/contracts";
+import { SIM_CALL_ID, simCallTimeline, simWrapUpTimeline } from "@onfloor/contracts/fixtures";
+import { newId } from "@onfloor/db/schema";
 import { calls } from "../../core/calls";
 import { AppError } from "../../core/errors";
 import { services } from "../../core/services";
@@ -20,22 +40,29 @@ import type { SynthesizedAudio } from "../../core/services/tts";
 import { replayTimeline, swapId } from "../../core/timeline";
 import { ENV } from "../../env.server";
 import { agentWeakSpots } from "../knowledge";
-import { translateTurn } from "../translation";
+import { ensureMerchantForPersona, findMerchantByUid, getMerchant } from "../merchants";
 import { getPersona } from "../personas";
 import { getScenario, listScenarios } from "../scenarios";
 import { scoreInBackground } from "../scoring";
-import { buildSystemPrompt, NUDGES, openingInstruction, parseReply, turnNote } from "./prompt";
+import { translateTurn } from "../translation";
+import { Coach, suggestDisposition } from "./guidance";
+import { buildSystemPrompt, NUDGES, openingInstruction, parseReply, requestsFor, turnNote } from "./prompt";
 
 /**
- * Pillar 1: the simulator engine. Server-authoritative: it owns the clock, the
- * transcript and the persona. One in-memory Session per active call; every turn is
- * persisted as it happens.
+ * Pillar 1: the simulator engine, for Tomato's outbound Max Grow calls. Server-authoritative:
+ * it owns the phases, clocks, transcript, the tools' state and the persona. One in-memory
+ * Session per active call; every turn and workspace action is persisted as it happens.
+ *
+ * Phases: dialing (Nugget ticket shown) → ringing after the scenario's random 2–5s delay →
+ * connected on the agent's `answer` → wrap_up when the conversation ends (the agent has
+ * `scenario.dispositionSec` to send the email and dispose) → done (scored in the background).
  *
  * Turn loop: the browser streams STT commits (`agent_turn`) → we wait AGENT_SETTLE_MS
  * for the agent to finish (more commits or `agent_activity` push it back) → one LLM
  * reply (job "roleplay") → control tags parsed → TTS → `turn` + `persona_audio`.
  *
- * STUB_ENGINES=true replays the fixture call instead (frontend dev without keys).
+ * STUB_ENGINES=true replays the fixture conversation after `answer` (frontend dev without keys);
+ * phases, tools and wrap-up stay real.
  */
 
 type Send = (msg: SimServerMessage) => void;
@@ -51,6 +78,10 @@ const MONOLOGUE_MS = 25_000;
 const INTERRUPT_AFTER_MS = 20_000;
 const MAX_NUDGES = 3;
 const HISTORY_TURNS = 24;
+/** Ringing this long without `answer` → missed call. */
+const MISSED_AFTER_MS = 45_000;
+/** The disposition suggestion never lands sooner than this after hang-up. */
+const SUGGESTION_MIN_MS = 2000;
 
 interface RequestState {
   request: CrmRequest;
@@ -61,19 +92,26 @@ interface RequestState {
 interface Session {
   callId: string;
   agentId: string;
+  agentName: string;
   persona: Persona;
+  merchant: Merchant;
   scenario: Scenario;
   language: StartSim["language"];
+  callDate: string;
   system: string;
   sockets: Set<Send>;
+  phase: SimPhase;
   started: boolean;
   finished: boolean;
-  /** Epoch ms of the call clock's zero. */
+  /** Epoch ms of the call clock's zero (set again at `answer`). */
   startedAt: number;
   history: ChatMessage[];
   patience: number;
   requests: Map<string, RequestState>;
-  crm: Record<string, unknown>;
+  /** What the customer decided, from their <decision/> tag. The disposition is audited against it. */
+  decision: Disposition | null;
+  campaign: Campaign | null;
+  emailTemplate: string | null;
   /** Bumped to cancel an in-flight reply (barge-in, new agent speech). */
   gen: number;
   replying: boolean;
@@ -89,6 +127,18 @@ interface Session {
   hangingUp: boolean;
   tick: ReturnType<typeof setInterval> | null;
   lastTimerAt: number;
+  ringTimer: ReturnType<typeof setTimeout> | null;
+  missedTimer: ReturnType<typeof setTimeout> | null;
+  wrapUpEndsAt: number;
+  wrapUpTimer: ReturnType<typeof setTimeout> | null;
+  wrapUpTick: ReturnType<typeof setInterval> | null;
+  guidanceOn: boolean;
+  /** The live coach (null with guidance off, and in stub mode, where the fixture streams guidance). */
+  coach: Coach | null;
+  guidance: GuidanceState | null;
+  suggestion: DispositionSuggestion | null;
+  /** Last results, re-sent on reconnect so the tools restore their state. */
+  lastLookup: WorkspaceResult | null;
   stubCancel: (() => void) | null;
 }
 
@@ -99,36 +149,47 @@ const audioStore = new Map<string, SynthesizedAudio>();
 const audioKey = (callId: string, turnId: string) => `${callId}:${turnId}`;
 export const getAudio = (callId: string, turnId: string) => audioStore.get(audioKey(callId, turnId)) ?? null;
 
-const elapsed = (s: Session) => Date.now() - s.startedAt;
+const elapsed = (s: Session) => (s.phase === "dialing" || s.phase === "ringing" ? 0 : Date.now() - s.startedAt);
 const broadcast = (s: Session, msg: SimServerMessage) => {
   for (const send of s.sockets) send(msg);
 };
 /** Rough spoken duration, for timers only (the browser reports the real end via playback_ended). */
 const estimateMs = (text: string) => Math.max(1200, text.split(/\s+/).length * 380 + 400);
+const rand = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
 
-function newSession(
-  callId: string,
-  agentId: string,
-  persona: Persona,
-  scenario: Scenario,
-  language: StartSim["language"],
-  weakSpots: string[] = [],
-): Session {
-  return {
-    callId,
-    agentId,
+function newSession(input: {
+  callId: string;
+  agent: Agent;
+  persona: Persona;
+  merchant: Merchant;
+  scenario: Scenario;
+  language: StartSim["language"];
+  callDate: string;
+  guidance: boolean;
+  weakSpots?: string[];
+}): Session {
+  const { persona, merchant } = input;
+  const s: Session = {
+    callId: input.callId,
+    agentId: input.agent.id,
+    agentName: input.agent.name,
     persona,
-    scenario,
-    language,
-    system: buildSystemPrompt(persona, scenario, language, weakSpots),
+    merchant,
+    scenario: input.scenario,
+    language: input.language,
+    callDate: input.callDate,
+    system: buildSystemPrompt({ persona, merchant, language: input.language, callDate: input.callDate, weakSpots: input.weakSpots }),
     sockets: new Set(),
+    phase: "dialing",
     started: false,
     finished: false,
     startedAt: Date.now(),
     history: [],
     patience: persona.traits.patience * 10,
-    requests: new Map(persona.crmRequests.map((r) => [r.id, { request: r, status: "not_asked" }])),
-    crm: { ...scenario.initialCrm },
+    requests: new Map(requestsFor(merchant, persona).map((r) => [r.id, { request: r, status: "not_asked" }])),
+    decision: null,
+    campaign: null,
+    emailTemplate: null,
     gen: 0,
     replying: false,
     personaSpeakingUntil: 0,
@@ -142,41 +203,97 @@ function newSession(
     hangingUp: false,
     tick: null,
     lastTimerAt: 0,
+    ringTimer: null,
+    missedTimer: null,
+    wrapUpEndsAt: 0,
+    wrapUpTimer: null,
+    wrapUpTick: null,
+    guidanceOn: input.guidance,
+    coach: null,
+    guidance: null,
+    suggestion: null,
+    lastLookup: null,
     stubCancel: null,
   };
+  if (input.guidance && !ENV.STUB_ENGINES) {
+    s.coach = new Coach(
+      { merchant, scenario: input.scenario, agentName: input.agent.name, callDate: input.callDate },
+      (g) => {
+        s.guidance = g;
+        broadcast(s, { type: "guidance", guidance: g });
+      },
+      () => elapsed(s),
+    );
+  }
+  return s;
 }
 
 // --- Session lifecycle ---------------------------------------------------------
 
-export async function startSim(agent: Agent, input: StartSim): Promise<SimSessionStart> {
-  const scenario = await getScenario(input.scenarioId);
-  // Per-call tweaks from the picker (traits, archetype, pace, voice) on top of the stored persona.
-  const persona = applyPersonaTuning(await getPersona(input.personaId ?? scenario.defaultPersonaId), input.tuning);
+/**
+ * The picker's choices → the merchant on the line + the behaviour to play.
+ * A live-call persona brings its own identity (a merchant profile is derived for it).
+ */
+async function resolveCast(scenario: Scenario, input: StartSim): Promise<{ merchant: Merchant; persona: Persona }> {
+  const picked = input.personaId ? await getPersona(input.personaId) : null;
+  const merchant = input.merchantId
+    ? await getMerchant(input.merchantId)
+    : picked?.source === "live_call"
+      ? await ensureMerchantForPersona(picked)
+      : await getMerchant(scenario.defaultMerchantId);
+  const base = picked ?? (await getPersona(merchant.defaultPersonaId).catch(() => getPersona(scenario.defaultPersonaId)));
+  const tuned = applyPersonaTuning(base, input.tuning);
+  // The voice belongs to the person on the line: the merchant's, unless replaying a live caller or tuned.
+  const voiceId = input.tuning?.voiceId ?? (base.source === "live_call" ? base.voiceId : merchant.voiceId);
+  return { merchant, persona: { ...tuned, voiceId } };
+}
+
+export async function startSim(agent: Agent, raw: StartSim): Promise<SimSessionStart> {
+  const input = startSimSchema.parse(raw);
+  const scenario = input.scenarioId ? await getScenario(input.scenarioId) : (await listScenarios())[0];
+  if (!scenario) throw new AppError("NOT_FOUND", { message: "No scenarios seeded. Run bun run db:seed." });
+  const { merchant, persona } = await resolveCast(scenario, input);
+  const callDate = todayIst();
   const call = await calls.create({
     kind: "sim",
     agentId: agent.id,
     language: input.language,
-    customerLabel: persona.name,
+    customerLabel: `${merchant.answerer.name} · ${merchant.restaurantName}`,
     scenarioId: scenario.id,
     personaId: persona.id,
+    merchantId: merchant.id,
+    guidance: input.guidance,
     replayOfCallId: input.replayOfCallId ?? null,
   });
   // RAG: this agent's past mistakes on similar ground, fetched alongside the STT token.
   const [weak, sttUrl] = await Promise.all([
-    agentWeakSpots(agent.id, `${scenario.objective} ${persona.objections.join(" ")} ${persona.tactics.join(" ")}`, 3),
+    agentWeakSpots(agent.id, `${scenario.objective} ${merchant.concerns.join(" ")} ${persona.objections.join(" ")}`, 3),
     sttUrlFor(call.id, input.language),
   ]);
   const weakSpots = weak.map((w) => w.text.replace(/\s+/g, " ").slice(0, 300));
   if (weakSpots.length) console.log(`[sim] ${call.id}: pressing on ${weakSpots.length} weak spot(s) from ${agent.name}'s past calls`);
-  sessions.set(call.id, newSession(call.id, agent.id, persona, scenario, input.language, weakSpots));
-  return { callId: call.id, scenario, persona, sttUrl };
+  sessions.set(
+    call.id,
+    newSession({ callId: call.id, agent, persona, merchant, scenario, language: input.language, callDate, guidance: input.guidance, weakSpots }),
+  );
+  return {
+    callId: call.id,
+    scenario,
+    persona,
+    merchant: toMerchantSummary(merchant),
+    ticket: toNuggetTicket(merchant),
+    agentName: agent.name,
+    guidance: input.guidance,
+    callDate,
+    sttUrl,
+  };
 }
 
 /** A fresh single-use STT URL ("" when ElevenLabs isn't configured). */
 async function sttUrlFor(_callId: string, language: StartSim["language"]): Promise<string> {
   if (!ENV.ELEVENLABS_API_KEY) return "";
   const token = await services.stt.mintRealtimeToken();
-  return services.stt.realtimeUrl({ language, keyTerms: ["OnFloor", "Premium", "Basic", "budget", "discount", "campaign"] }, token);
+  return services.stt.realtimeUrl({ language, keyTerms: ["Tomato", "Max Grow", "DRR", "commission", "incremental", "payout", "campaign", "Ad Studio"] }, token);
 }
 
 export async function refreshSttUrl(agent: Agent, callId: string): Promise<{ url: string }> {
@@ -185,54 +302,102 @@ export async function refreshSttUrl(agent: Agent, callId: string): Promise<{ url
 }
 
 /** Replay a (live) call's extracted persona in the simulator. */
-export async function replayCall(agent: Agent, sourceCallId: string): Promise<SimSessionStart> {
+export async function replayCall(agent: Agent, sourceCallId: string, guidance = true): Promise<SimSessionStart> {
   const source = await calls.getOwned(sourceCallId, agent);
   if (!source.personaId) throw new AppError("BAD_REQUEST", { message: "No persona has been extracted from that call yet." });
   const persona = await getPersona(source.personaId);
-  const scenarioId = source.scenarioId ?? (await listScenarios())[0]?.id;
-  if (!scenarioId) throw new AppError("NOT_FOUND", { message: "No scenarios seeded." });
-  return startSim(agent, { scenarioId, personaId: persona.id, language: persona.language, replayOfCallId: source.id });
+  return startSim(agent, { personaId: persona.id, language: persona.language, guidance, replayOfCallId: source.id });
+}
+
+/** After a server restart: rebuild the session from the DB (the conversation so far becomes history). */
+async function rebuild(agent: Agent, callId: string): Promise<Session> {
+  const call = await calls.getOwned(callId, agent);
+  if (call.status !== "active" || !call.scenarioId || !call.personaId || !call.merchantId) {
+    throw new AppError("BAD_REQUEST", { message: "That call has ended." });
+  }
+  const [persona, merchant, scenario, turns] = await Promise.all([
+    getPersona(call.personaId),
+    getMerchant(call.merchantId),
+    getScenario(call.scenarioId),
+    calls.transcript(callId),
+  ]);
+  const s = newSession({ callId, agent, persona, merchant, scenario, language: call.language, callDate: todayIst(new Date(call.startedAt)), guidance: call.guidance });
+  if (turns.length) {
+    s.phase = "connected";
+    s.started = true;
+    s.startedAt = Date.now() - (turns.at(-1)?.endMs ?? 0);
+    s.history = turns.map((t) => ({ role: t.speaker === "customer" ? "assistant" : "user", content: t.text }) as ChatMessage);
+    s.tick = setInterval(() => void tick(s), 1000);
+  }
+  return s;
 }
 
 export async function attachSocket(agent: Agent, callId: string, send: Send): Promise<() => void> {
-  const call = await calls.getOwned(callId, agent);
+  await calls.getOwned(callId, agent);
   let s = sessions.get(callId);
   if (!s) {
-    // Server restarted mid-call, or a session created elsewhere: rebuild from the DB.
-    if (call.status !== "active" || !call.scenarioId || !call.personaId) {
-      throw new AppError("BAD_REQUEST", { message: "That call has ended." });
-    }
-    s = newSession(callId, agent.id, await getPersona(call.personaId), await getScenario(call.scenarioId), call.language);
+    s = await rebuild(agent, callId);
     sessions.set(callId, s);
   }
   const session = s;
   session.sockets.add(send);
 
-  if (ENV.STUB_ENGINES) {
-    if (!session.stubCancel) startStub(session);
-  } else if (!session.started) {
-    void begin(session);
+  if (session.phase === "dialing" && !session.ringTimer) {
+    send({ type: "phase", phase: "dialing", remainingMs: null });
+    const [min, max] = session.scenario.ringDelayMs;
+    session.ringTimer = setTimeout(() => ring(session), rand(min, max));
   } else {
     // Reconnect: catch the client up.
-    send({ type: "state", status: "active", elapsedMs: elapsed(session) });
-    for (const turn of await calls.transcript(callId)) send({ type: "turn", turn });
-    send({ type: "patience", value: Math.round(session.patience) });
+    send({ type: "phase", phase: session.phase, remainingMs: session.phase === "wrap_up" ? Math.max(0, session.wrapUpEndsAt - Date.now()) : null });
+    if (session.phase !== "dialing" && session.phase !== "ringing") {
+      send({ type: "state", status: session.phase === "wrap_up" ? "wrap_up" : "active", elapsedMs: elapsed(session) });
+      for (const turn of await calls.transcript(callId)) send({ type: "turn", turn });
+      send({ type: "patience", value: Math.round(session.patience) });
+    }
+    if (session.lastLookup) send({ type: "workspace_result", result: session.lastLookup });
+    if (session.campaign) send({ type: "workspace_result", result: { kind: "campaign_launch", ok: true, error: null, campaign: session.campaign } });
+    if (session.guidance) send({ type: "guidance", guidance: session.guidance });
+    if (session.suggestion) send({ type: "disposition_suggestion", suggestion: session.suggestion });
   }
   return () => session.sockets.delete(send);
 }
 
-async function begin(s: Session) {
-  s.started = true;
+function setPhase(s: Session, phase: SimPhase, remainingMs: number | null = null) {
+  s.phase = phase;
+  broadcast(s, { type: "phase", phase, remainingMs });
+}
+
+function ring(s: Session) {
+  s.ringTimer = null;
+  if (s.finished || s.phase !== "dialing") return;
+  setPhase(s, "ringing");
+  s.missedTimer = setTimeout(() => void endConversation(s, "missed"), MISSED_AFTER_MS);
+}
+
+async function answer(s: Session) {
+  if (s.phase !== "ringing" && s.phase !== "dialing") return;
+  if (s.ringTimer) clearTimeout(s.ringTimer);
+  if (s.missedTimer) clearTimeout(s.missedTimer);
+  s.ringTimer = s.missedTimer = null;
   s.startedAt = Date.now();
   s.lastActivityAt = Date.now();
+  setPhase(s, "connected");
+  await calls.markConnected(s.callId);
+  s.coach?.start();
+  if (ENV.STUB_ENGINES) startStub(s);
+  else await begin(s);
+}
+
+async function begin(s: Session) {
+  s.started = true;
   broadcast(s, { type: "state", status: "active", elapsedMs: 0 });
   broadcast(s, { type: "patience", value: Math.round(s.patience) });
   s.tick = setInterval(() => void tick(s), 1000);
-  // The model sees the rep pick up first (Gemini wants a user turn before the model's).
-  s.history.push({ role: "user", content: "Hello?" });
+  // The model needs a user turn before its own: the phone ringing is it.
+  s.history.push({ role: "user", content: "(the phone rings; you pick up)" });
 
-  // Rendered by the model so it matches the language rule and script (stored opening lines
-  // are often Romanised Hinglish, which neither voice reads well in another language).
+  // Rendered by the model so it matches the language rule (stored opening lines are often
+  // Romanised Hinglish, which neither voice reads well in another language).
   await reply(s, openingInstruction(s.persona), { opening: true });
 }
 
@@ -254,7 +419,7 @@ async function speak(s: Session, text: string) {
     console.error("[sim] TTS failed", err);
     broadcast(s, { type: "error", code: "VOICE_FAILED", message: "Couldn't voice that line; it's in the transcript.", retryable: true });
   }
-  if (s.finished) return;
+  if (s.finished || s.phase !== "connected") return;
 
   const turn = await calls.appendTurn(s.callId, {
     speaker: "customer",
@@ -273,12 +438,18 @@ async function speak(s: Session, text: string) {
   s.speakingTurn = { id: turn.id, startMs };
   broadcast(s, { type: "persona_state", state: "speaking" });
   broadcast(s, { type: "turn", turn });
-  subtitle(s, turn);
+  onNewTurn(s, turn);
   broadcast(s, {
     type: "persona_audio",
     turnId: turn.id,
     audioUrl: audio ? `/api/sim/sessions/${s.callId}/audio/${turn.id}` : "",
   });
+}
+
+/** Every committed turn: subtitle it, and let the coach re-read the call. */
+function onNewTurn(s: Session, turn: TranscriptTurn) {
+  subtitle(s, turn);
+  if (s.coach) void calls.transcript(s.callId).then((turns) => s.coach?.onTurns(turns));
 }
 
 /** English subtitle for a Hindi/Hinglish turn, pushed when Merge returns it (may lag the turn). */
@@ -302,6 +473,7 @@ function note(s: Session, extra?: string) {
     patience: s.patience,
     elapsedSec: Math.round(elapsed(s) / 1000),
     wrapUp: s.wrapUp,
+    decision: s.decision,
     requests: [...s.requests.values()].map((r) => ({
       request: r.request,
       status: r.status,
@@ -311,13 +483,19 @@ function note(s: Session, extra?: string) {
   });
 }
 
+function recordDecision(s: Session, decision: Disposition) {
+  if (s.decision) return;
+  s.decision = decision;
+  void calls.recordWorkspace(s.callId, { actor: "persona", kind: "decision", body: { value: decision }, atMs: elapsed(s) }).catch((e) => console.error("[sim] decision", e));
+}
+
 /**
  * One persona reply. `instruction` is appended as the last user message (used for the
  * opening line and for interruptions); otherwise the call note rides on the agent's
  * latest message.
  */
 async function reply(s: Session, instruction?: string, opts: { opening?: boolean } = {}) {
-  if (s.finished || s.hangingUp) return;
+  if (s.finished || s.hangingUp || s.phase !== "connected") return;
   const gen = ++s.gen;
   s.replying = true;
   broadcast(s, { type: "persona_state", state: "thinking" });
@@ -337,9 +515,14 @@ async function reply(s: Session, instruction?: string, opts: { opening?: boolean
       const retry = parseReply(
         await ask([...messages, { role: "user", content: "[call note: you must SAY something out loud now, one short line, then the tags.]" }]),
       );
-      parsed = { ...retry, crmRequestIds: [...parsed.crmRequestIds, ...retry.crmRequestIds], patienceDelta: parsed.patienceDelta ?? retry.patienceDelta };
+      parsed = {
+        ...retry,
+        crmRequestIds: [...parsed.crmRequestIds, ...retry.crmRequestIds],
+        patienceDelta: parsed.patienceDelta ?? retry.patienceDelta,
+        decision: parsed.decision ?? retry.decision,
+      };
     }
-    if (gen !== s.gen || s.finished) return; // superseded by barge-in or newer speech
+    if (gen !== s.gen || s.finished || s.phase !== "connected") return; // superseded by barge-in or newer speech
 
     for (const id of parsed.crmRequestIds) {
       const r = s.requests.get(id);
@@ -348,8 +531,10 @@ async function reply(s: Session, instruction?: string, opts: { opening?: boolean
       r.askedAt = Date.now();
       const atMs = elapsed(s);
       broadcast(s, { type: "crm_request", request: r.request, atMs });
+      s.coach?.noteRequest(r.request);
       void calls.recordCrmRequestVoiced(s.callId, id, atMs).catch((e) => console.error("[sim] voiced", e));
     }
+    if (parsed.decision) recordDecision(s, parsed.decision);
     if (!opts.opening && parsed.patienceDelta !== null) setPatience(s, s.patience + parsed.patienceDelta);
 
     const hangUp = parsed.hangUp || s.patience <= 0;
@@ -362,7 +547,7 @@ async function reply(s: Session, instruction?: string, opts: { opening?: boolean
     await speak(s, line);
     if (hangUp) {
       const wait = Math.max(0, s.personaSpeakingUntil - Date.now()) + 600;
-      setTimeout(() => void endCall(s, "persona_hung_up"), wait);
+      setTimeout(() => void endConversation(s, "persona_hung_up"), wait);
     }
   } catch (err) {
     if (gen !== s.gen) return;
@@ -386,22 +571,30 @@ function scheduleFlush(s: Session) {
   s.settleTimer = setTimeout(() => void flushAgent(s), AGENT_SETTLE_MS);
 }
 
+async function persistAgentBuffer(s: Session): Promise<TranscriptTurn | null> {
+  const parts = s.agentBuffer.splice(0);
+  if (!parts.length) return null;
+  return calls.appendTurn(s.callId, {
+    speaker: "agent",
+    text: parts.map((p) => p.text).join(" "),
+    language: s.language,
+    startMs: parts[0]!.startMs,
+    endMs: parts.at(-1)!.endMs,
+  });
+}
+
 async function flushAgent(s: Session, extra?: string) {
   if (s.settleTimer) clearTimeout(s.settleTimer);
   s.settleTimer = null;
-  const parts = s.agentBuffer.splice(0);
   s.agentTalkStartedAt = null;
   s.nudges = 0;
 
-  if (parts.length) {
-    const text = parts.map((p) => p.text).join(" ");
-    const startMs = parts[0]!.startMs;
-    const endMs = parts.at(-1)!.endMs;
-    const turn = await calls.appendTurn(s.callId, { speaker: "agent", text, language: s.language, startMs, endMs });
+  const turn = await persistAgentBuffer(s);
+  if (turn) {
     broadcast(s, { type: "turn", turn });
-    subtitle(s, turn);
-    s.history.push({ role: "user", content: text });
-    if (endMs - startMs > MONOLOGUE_MS) setPatience(s, s.patience - 10);
+    onNewTurn(s, turn);
+    s.history.push({ role: "user", content: turn.text });
+    if (turn.endMs - turn.startMs > MONOLOGUE_MS) setPatience(s, s.patience - 10);
   } else if (extra) {
     s.history.push({ role: "user", content: "(the rep keeps talking at length)" });
   } else {
@@ -416,14 +609,19 @@ export async function handleClientMessage(callId: string, msg: SimClientMessage)
   const now = Date.now();
 
   switch (msg.type) {
-    case "crm_action":
-      await onCrmAction(s, msg.action);
+    case "answer":
+      await answer(s);
+      return;
+    case "workspace":
+      await onWorkspace(s, msg.action);
       return;
     case "end":
-      await endCall(s, "agent");
+      await endConversation(s, s.phase === "connected" ? "agent" : "missed");
+      return;
+    case "ping":
       return;
   }
-  if (ENV.STUB_ENGINES) return; // the fixture already contains the conversation
+  if (ENV.STUB_ENGINES || s.phase !== "connected") return; // the fixture already contains the conversation
 
   switch (msg.type) {
     case "agent_turn": {
@@ -432,7 +630,7 @@ export async function handleClientMessage(callId: string, msg: SimClientMessage)
       // New speech supersedes a reply still being generated.
       if (s.replying) s.gen++;
       const endMs = Math.min(msg.endMs, elapsed(s));
-      s.agentBuffer.push({ text: msg.text, startMs: Math.min(msg.startMs, endMs), endMs });
+      s.agentBuffer.push({ text: msg.text, startMs: Math.max(0, Math.min(msg.startMs, endMs)), endMs });
       scheduleFlush(s);
       return;
     }
@@ -485,24 +683,111 @@ function closeSpeakingTurn(s: Session) {
   void calls.setTurnEnd(t.id, Math.max(t.startMs + 300, elapsed(s))).catch((e) => console.error("[sim] turn end", e));
 }
 
-function sameValue(a: unknown, b: unknown): boolean {
-  if (Array.isArray(a) && Array.isArray(b)) return JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
-  return a === b || (typeof a === "number" && typeof b === "number" && Math.abs(a - b) < 1e-9);
+// --- Workspace (Nugget / Merchant Dashboard / Ad Studio) -------------------------------
+
+const fail = <K extends WorkspaceResult["kind"]>(kind: K, error: string) =>
+  ({ kind, ok: false, error, ...(kind === "campaign_launch" ? { campaign: null } : kind === "email_sent" ? { email: null } : {}) }) as WorkspaceResult;
+
+/** The email the customer wants used: the corrected one if they gave it, else the one on record. */
+function currentEmail(s: Session): string {
+  const update = [...s.requests.values()].find((r) => r.request.kind === "email_update" && r.status !== "not_asked");
+  return update ? resolveRequest(update.request, s.callDate).email! : s.merchant.email;
 }
 
-async function onCrmAction(s: Session, action: CrmAction) {
-  await calls.recordCrmAction(s.callId, action);
-  s.crm[action.field] = action.to;
+/** A launched campaign settles the requests it reflects, so the persona stops asking. */
+function settleRequests(s: Session, c: Campaign) {
   for (const r of s.requests.values()) {
-    if (r.request.field !== action.field || r.status === "not_asked") continue;
-    r.status = sameValue(action.to, r.request.value) ? "done" : "pending";
+    if (r.status === "not_asked") continue;
+    const v = resolveRequest(r.request, s.callDate);
+    const ok =
+      r.request.kind === "email_update" ? c.email.toLowerCase() === v.email
+        : r.request.kind === "start_date" ? c.startDate === v.date
+          : r.request.kind === "duration" ? c.endDate >= addMonths(c.startDate, v.months!)
+            : false;
+    if (ok) r.status = "done";
+  }
+}
+async function onWorkspace(s: Session, action: WorkspaceAction) {
+  const atMs = elapsed(s);
+  const log = (body: Record<string, unknown>) =>
+    calls.recordWorkspace(s.callId, { actor: "agent", kind: action.kind, body, atMs }).catch((e) => console.error("[sim] workspace log", e));
+  const result = (r: WorkspaceResult) => broadcast(s, { type: "workspace_result", result: r });
+  const live = s.phase === "connected" || s.phase === "wrap_up";
+
+  switch (action.kind) {
+    case "tab_opened": {
+      void log({ tab: action.tab });
+      if (action.tab === "merchant_dashboard") s.coach?.dashboardOpened();
+      return result({ kind: "tab_opened", ok: true });
+    }
+    case "dashboard_lookup": {
+      const found = await findMerchantByUid(action.uid);
+      void log({ uid: action.uid, found: !!found, matchesTicket: action.uid.trim() === s.merchant.uid });
+      const r: WorkspaceResult = { kind: "dashboard_lookup", ok: !!found, uid: action.uid, merchant: found ? toMerchantDashboard(found) : null };
+      s.lastLookup = r;
+      if (found?.id === s.merchant.id) s.coach?.markTool("lookup");
+      return result(r);
+    }
+    case "campaign_launch": {
+      if (!live) return result(fail("campaign_launch", "Pick up the call first."));
+      const target = await findMerchantByUid(action.campaign.uid);
+      const error = validateCampaign(action.campaign, { today: s.callDate, uidExists: !!target });
+      void log({ campaign: action.campaign, ok: !error, error });
+      if (error || !target) return result(fail("campaign_launch", error ?? "No merchant found."));
+      const campaign: Campaign = {
+        ...action.campaign,
+        email: action.campaign.email.toLowerCase(),
+        id: newId("cmp"),
+        restaurantName: target.restaurantName,
+        status: action.campaign.startDate === s.callDate ? "live" : "scheduled",
+        launchedAtMs: atMs,
+      };
+      s.campaign = campaign;
+      settleRequests(s, campaign);
+      s.coach?.setCampaign(campaign);
+      return result({ kind: "campaign_launch", ok: true, error: null, campaign });
+    }
+    case "email_sent": {
+      if (s.phase !== "wrap_up") return result(fail("email_sent", "Send the email from Nugget after the call ends."));
+      const email = renderEmail(action.template, {
+        ownerName: s.merchant.ownerName,
+        restaurantName: s.merchant.restaurantName,
+        uid: s.merchant.uid,
+        drr: s.merchant.drr,
+        agentName: s.agentName,
+        campaign: s.campaign,
+        callback: action.callback,
+      });
+      const to = s.campaign?.email ?? currentEmail(s);
+      s.emailTemplate = action.template;
+      void log({ template: action.template, callback: action.callback, to });
+      return result({ kind: "email_sent", ok: true, error: null, email: { to, ...email } });
+    }
+    case "dispose": {
+      if (s.phase !== "wrap_up") return result(fail("dispose", "You can dispose the call once it has ended."));
+      const { outcome, callback } = action.disposition;
+      if (outcome === "callback" && (!callback || !callbackSlotSchema.safeParse(callback).success)) {
+        return result(fail("dispose", "Pick the callback date and time first."));
+      }
+      if (callback && callback.date < s.callDate) return result(fail("dispose", "The callback can't be in the past."));
+      const secondsTaken = Math.round((Date.now() - (s.wrapUpEndsAt - s.scenario.dispositionSec * 1000)) / 1000);
+      await calls.recordWorkspace(s.callId, {
+        actor: "agent",
+        kind: "dispose",
+        body: { outcome, callback: outcome === "callback" ? callback : null, secondsTaken },
+        atMs,
+      });
+      result({ kind: "dispose", ok: true, error: null });
+      s.coach?.markTool("disposition");
+      return finalize(s);
+    }
   }
 }
 
 // --- Clock -----------------------------------------------------------------------
 
 async function tick(s: Session) {
-  if (s.finished) return;
+  if (s.finished || s.phase !== "connected") return;
   const now = Date.now();
   const ms = elapsed(s);
   const hardMs = s.scenario.hardLimitSec * 1000;
@@ -512,67 +797,129 @@ async function tick(s: Session) {
     broadcast(s, { type: "timer", elapsedMs: ms, remainingMs: Math.max(0, hardMs - ms) });
   }
   if (!s.wrapUp && ms >= s.scenario.softLimitSec * 1000) s.wrapUp = true;
-  if (ms >= hardMs) return endCall(s, "time");
+  if (ms >= hardMs) return endConversation(s, "time");
 
   // Agent went quiet mid-stretch without a commit: stop counting it as talking.
   if (s.agentTalkStartedAt && now - s.lastActivityAt > 2500 && !s.settleTimer) s.agentTalkStartedAt = null;
 
   const quietSince = Math.max(s.lastActivityAt, s.personaSpeakingUntil);
   const idle = !s.replying && !s.hangingUp && !s.settleTimer && !s.agentTalkStartedAt && s.agentBuffer.length === 0;
-  if (idle && s.history.length > 0 && now - quietSince > DEAD_AIR_MS) {
+  if (idle && s.history.length > 1 && now - quietSince > DEAD_AIR_MS) {
     s.nudges += 1;
     s.lastActivityAt = now;
     setPatience(s, s.patience - 10);
     if (s.nudges >= MAX_NUDGES || s.patience <= 0) {
       s.hangingUp = true;
       await speak(s, NUDGES[s.language][2]!);
-      setTimeout(() => void endCall(s, "persona_hung_up"), Math.max(0, s.personaSpeakingUntil - Date.now()) + 600);
+      setTimeout(() => void endConversation(s, "persona_hung_up"), Math.max(0, s.personaSpeakingUntil - Date.now()) + 600);
     } else {
       await speak(s, NUDGES[s.language][s.nudges - 1]!);
     }
   }
 }
 
-// --- End -------------------------------------------------------------------------
+// --- End: conversation over → wrap-up → scoring ------------------------------------
 
-async function endCall(s: Session, reason: "agent" | "persona_hung_up" | "time") {
-  if (s.finished) return;
+/** The conversation is over. Enough of a call → wrap-up (disposition window); otherwise abandoned. */
+async function endConversation(s: Session, reason: "agent" | "persona_hung_up" | "time" | "missed") {
+  if (s.finished || s.phase === "wrap_up" || s.phase === "done") return;
+  const wasConnected = s.phase === "connected";
+  s.gen++;
+  if (s.tick) clearInterval(s.tick);
+  if (s.settleTimer) clearTimeout(s.settleTimer);
+  if (s.ringTimer) clearTimeout(s.ringTimer);
+  if (s.missedTimer) clearTimeout(s.missedTimer);
+  s.tick = s.settleTimer = s.ringTimer = s.missedTimer = null;
+  s.stubCancel?.();
+  s.stubCancel = null;
+  if (wasConnected) {
+    const turn = await persistAgentBuffer(s); // what the agent said that hadn't settled yet
+    if (turn) broadcast(s, { type: "turn", turn });
+  }
   broadcast(s, { type: "persona_state", state: "idle" });
   broadcast(s, { type: "ended", reason, callId: s.callId });
-  await finishSim(s.callId);
+
+  const agentTurns = wasConnected ? (await calls.transcript(s.callId)).filter((t) => t.speaker === "agent").length : 0;
+  // Fewer than 2 agent turns isn't enough conversation to judge (or to dispose).
+  if (agentTurns < 2) {
+    await calls.end(s.callId, "abandoned");
+    setPhase(s, "done");
+    cleanup(s);
+    return;
+  }
+
+  await calls.end(s.callId, "wrap_up");
+  const windowMs = s.scenario.dispositionSec * 1000;
+  s.wrapUpEndsAt = Date.now() + windowMs;
+  broadcast(s, { type: "state", status: "wrap_up", elapsedMs: elapsed(s) });
+  setPhase(s, "wrap_up", windowMs);
+  s.coach?.callEnded();
+  s.wrapUpTick = setInterval(() => broadcast(s, { type: "phase", phase: "wrap_up", remainingMs: Math.max(0, s.wrapUpEndsAt - Date.now()) }), 5000);
+  // Timer ran out without a disposition: scored as late (QA deduction).
+  s.wrapUpTimer = setTimeout(() => void finalize(s), windowMs);
+  if (s.guidanceOn) void suggest(s);
+}
+
+async function suggest(s: Session) {
+  const startedAt = Date.now();
+  let suggestion: DispositionSuggestion;
+  if (ENV.STUB_ENGINES) {
+    const fixture = simWrapUpTimeline.find((m) => m.event.type === "disposition_suggestion")?.event;
+    suggestion = fixture?.type === "disposition_suggestion" ? fixture.suggestion : { outcome: "not_interested", template: "follow_up", callback: null, reason: "" };
+  } else {
+    suggestion = await suggestDisposition({
+      merchant: s.merchant,
+      callDate: s.callDate,
+      turns: await calls.transcript(s.callId),
+      campaign: s.campaign,
+      fallback: s.decision,
+    });
+  }
+  await new Promise((r) => setTimeout(r, Math.max(0, SUGGESTION_MIN_MS - (Date.now() - startedAt))));
+  if (s.finished) return;
+  s.suggestion = suggestion;
+  broadcast(s, { type: "disposition_suggestion", suggestion });
+}
+
+/** Disposed (or the timer ran out): score it in the background. Idempotent. */
+async function finalize(s: Session) {
+  if (s.finished) return;
+  cleanup(s);
+  await calls.setStatus(s.callId, "scoring");
+  broadcast(s, { type: "state", status: "scoring", elapsedMs: 0 });
+  setPhase(s, "done");
+  scoreInBackground(s.callId);
 }
 
 function cleanup(s: Session) {
   s.finished = true;
   s.gen++;
-  if (s.tick) clearInterval(s.tick);
-  if (s.settleTimer) clearTimeout(s.settleTimer);
+  for (const t of [s.ringTimer, s.missedTimer, s.settleTimer, s.wrapUpTimer]) if (t) clearTimeout(t);
+  for (const t of [s.tick, s.wrapUpTick]) if (t) clearInterval(t);
   s.stubCancel?.();
-  sessions.delete(s.callId);
+  // Keep the sockets a moment so the final messages reach the client.
+  setTimeout(() => sessions.delete(s.callId), 5000);
 }
 
-/** Idempotent. Ends the call, then scores it in the background. */
+/**
+ * REST `POST /api/sim/sessions/:callId/end`: the agent hung up. A connected call goes to wrap-up
+ * (dispose in Nugget, then it's scored); a call never picked up is abandoned. Idempotent.
+ */
 export async function finishSim(callId: string): Promise<{ callId: string; status: string }> {
   const s = sessions.get(callId);
-  if (s) {
-    // Persist anything the agent said that hasn't settled yet.
-    if (s.agentBuffer.length && !s.finished) {
-      const parts = s.agentBuffer.splice(0);
-      await calls.appendTurn(callId, {
-        speaker: "agent",
-        text: parts.map((p) => p.text).join(" "),
-        language: s.language,
-        startMs: parts[0]!.startMs,
-        endMs: parts.at(-1)!.endMs,
-      });
-    }
-    cleanup(s);
+  if (s && !s.finished) {
+    if (s.phase !== "wrap_up") await endConversation(s, s.phase === "connected" ? "agent" : "missed");
+    return { callId, status: (await calls.get(callId)).status };
   }
   const call = await calls.get(callId);
+  if (call.status === "wrap_up") {
+    // Server restarted during wrap-up: nobody can dispose any more, so score it as is.
+    await calls.setStatus(callId, "scoring");
+    scoreInBackground(callId);
+    return { callId, status: "scoring" };
+  }
   if (call.status !== "active") return { callId, status: call.status };
-
   const agentTurns = (await calls.transcript(callId)).filter((t) => t.speaker === "agent").length;
-  // Fewer than 2 agent turns isn't enough conversation to judge fairly.
   if (agentTurns < 2) {
     await calls.end(callId, "abandoned");
     return { callId, status: "abandoned" };
@@ -585,11 +932,17 @@ export async function finishSim(callId: string): Promise<{ callId: string; statu
 // --- Stub (STUB_ENGINES=true) --------------------------------------------------------
 
 function startStub(s: Session) {
-  s.startedAt = Date.now();
   s.started = true;
   s.stubCancel = replayTimeline(
-    simCallTimeline,
+    simCallTimeline.filter((m) => m.event.type !== "phase" && (s.guidanceOn || m.event.type !== "guidance")),
     (msg) => {
+      if (msg.type === "ended") {
+        // The fixture customer accepts; the engine's own wrap-up takes it from here.
+        recordDecision(s, "accepted");
+        void endConversation(s, msg.reason);
+        return;
+      }
+      if (msg.type === "guidance") s.guidance = msg.guidance;
       broadcast(s, msg);
       void persistStubEvent(s, msg);
     },
@@ -603,9 +956,9 @@ async function persistStubEvent(s: Session, msg: SimServerMessage) {
       const { speaker, text, language, startMs, endMs } = msg.turn;
       await calls.appendTurn(s.callId, { speaker, text, language, startMs, endMs });
     } else if (msg.type === "crm_request") {
+      const r = s.requests.get(msg.request.id);
+      if (r) r.status = "pending";
       await calls.recordCrmRequestVoiced(s.callId, msg.request.id, msg.atMs);
-    } else if (msg.type === "ended") {
-      await finishSim(s.callId);
     }
   } catch (err) {
     console.error("[sim stub] persist failed", err);

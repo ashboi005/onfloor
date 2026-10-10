@@ -9,6 +9,7 @@ import { ENV } from "./env.server";
 import { callRoutes } from "./modules/calls/routes";
 import { knowledgeRoutes } from "./modules/knowledge/routes";
 import { liveRoutes } from "./modules/live/routes";
+import { merchantRoutes } from "./modules/merchants";
 import { personaRoutes } from "./modules/personas/routes";
 import { scenarioRoutes } from "./modules/scenarios";
 import { simRoutes } from "./modules/sim/routes";
@@ -20,6 +21,7 @@ import { auth } from "./services";
     /api/me              signed-in agent
     /api/scenarios       Ashwath
     /api/personas        Ashwath (POST used by Tushar's persona extraction)
+    /api/merchants       Ashwath (Tomato merchant profiles for the picker)
     /api/sim/*, /ws/sim  Ashwath
     /api/calls/*         Ashwath (list, transcript, scorecard, replay)
     /api/live/*, /ws/live, /internal/live/ingest   Tushar
@@ -73,6 +75,7 @@ const app = new Elysia({ websocket: { idleTimeout: 960 } })
   )
   .use(scenarioRoutes)
   .use(personaRoutes)
+  .use(merchantRoutes)
   .use(simRoutes)
   .use(callRoutes)
   .use(liveRoutes)

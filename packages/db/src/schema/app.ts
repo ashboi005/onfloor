@@ -2,16 +2,17 @@ import {
   ARCHETYPES,
   CALL_KINDS,
   CALL_STATUSES,
+  type CreateMerchant,
   type CreatePersona,
-  CRM_FIELD_KEYS,
   LANGUAGES,
   type LiveEvent,
+  MERCHANT_SOURCES,
   PERSONA_SOURCES,
   type Scenario,
   type Scorecard,
   SPEAKERS,
 } from "@onfloor/contracts";
-import { index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 /**
@@ -38,6 +39,22 @@ export const personas = pgTable(
   (t) => [index("personas_source_idx").on(t.source)],
 );
 
+/** Tomato restaurant partners the simulator calls (seed), or derived from a live-call persona. */
+export const merchants = pgTable(
+  "merchants",
+  {
+    id: text("id").primaryKey().$defaultFn(() => newId("mer")),
+    /** The 8-digit Tomato UID typed into Merchant Dashboard / Ad Studio. */
+    uid: text("uid").notNull(),
+    restaurantName: text("restaurant_name").notNull(),
+    source: text("source", { enum: MERCHANT_SOURCES }).notNull(),
+    sourcePersonaId: text("source_persona_id"),
+    body: jsonb("body").$type<CreateMerchant>().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("merchants_uid_idx").on(t.uid), index("merchants_source_idx").on(t.source)],
+);
+
 export const scenarios = pgTable("scenarios", {
   id: text("id").primaryKey(),
   body: jsonb("body").$type<Omit<Scenario, "id">>().notNull(),
@@ -55,6 +72,8 @@ export const calls = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     scenarioId: text("scenario_id").references(() => scenarios.id),
     personaId: text("persona_id").references(() => personas.id),
+    merchantId: text("merchant_id").references(() => merchants.id),
+    guidance: boolean("guidance").notNull().default(false),
     replayOfCallId: text("replay_of_call_id"),
     language: text("language", { enum: LANGUAGES }).notNull(),
     customerLabel: text("customer_label").notNull(),
@@ -88,20 +107,24 @@ export const transcriptTurns = pgTable(
   (t) => [uniqueIndex("transcript_turns_call_seq_idx").on(t.callId, t.seq)],
 );
 
-/** Every committed Mock CRM change during a sim call. */
-export const crmActions = pgTable(
-  "crm_actions",
+/**
+ * Every workspace action of a sim call (agent: tab_opened, dashboard_lookup, campaign_launch,
+ * email_sent, dispose) and what the persona established (persona: decision), in call time.
+ * The scoring audit replays this log.
+ */
+export const workspaceActions = pgTable(
+  "workspace_actions",
   {
     id: serial("id").primaryKey(),
     callId: text("call_id")
       .notNull()
       .references(() => calls.id, { onDelete: "cascade" }),
-    field: text("field", { enum: CRM_FIELD_KEYS }).notNull(),
-    from: jsonb("from"),
-    to: jsonb("to"),
+    actor: text("actor", { enum: ["agent", "persona"] }).notNull(),
+    kind: text("kind").notNull(),
+    body: jsonb("body").$type<Record<string, unknown>>().notNull(),
     atMs: integer("at_ms").notNull(),
   },
-  (t) => [index("crm_actions_call_idx").on(t.callId)],
+  (t) => [index("workspace_actions_call_idx").on(t.callId)],
 );
 
 /** When the persona actually voiced each crmRequest, so the audit can measure latency. */

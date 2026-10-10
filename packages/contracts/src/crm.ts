@@ -17,8 +17,8 @@ export const workspaceActionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("tab_opened"), tab: z.enum(WORKSPACE_TABS) }),
   z.object({ kind: z.literal("dashboard_lookup"), uid: z.string().trim() }),
   z.object({ kind: z.literal("campaign_launch"), campaign: campaignDraftSchema }),
-  /** Wrap-up only. */
-  z.object({ kind: z.literal("email_sent"), template: z.enum(EMAIL_TEMPLATE_IDS) }),
+  /** Wrap-up only. `callback` fills the callback template's date/time (send the slot you'll dispose with). */
+  z.object({ kind: z.literal("email_sent"), template: z.enum(EMAIL_TEMPLATE_IDS), callback: callbackSlotSchema.nullable().default(null) }),
   /** Wrap-up only. Closes the call and sends it for scoring. */
   z.object({ kind: z.literal("dispose"), disposition: dispositionSchema }),
 ]);

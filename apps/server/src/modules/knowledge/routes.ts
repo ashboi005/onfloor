@@ -5,7 +5,7 @@ import { authGuard } from "../../core/auth-guard";
 import { AppError } from "../../core/errors";
 import { services } from "../../core/services";
 import { ENV } from "../../env.server";
-import { ingestPlaybook } from ".";
+import { ingestOrgDocs } from ".";
 
 const managerOnly = (role: string) => {
   if (role !== "manager") throw new AppError("FORBIDDEN", { message: "Managers only." });
@@ -23,7 +23,7 @@ const slug = (s: string) =>
  *   GET    /docs                       org_docs sources
  *   POST   /docs                       (manager) upload/replace a markdown or text doc
  *   DELETE /docs/:source               (manager)
- *   POST   /docs/playbook/reindex      (manager) re-ingest the bundled playbook
+ *   POST   /docs/playbook/reindex      (manager) re-ingest the bundled company docs (apps/server/knowledge/*.md)
  *   GET    /search?q=&scope=&key=      snippets; agent scope is always your own unless manager
  */
 export const knowledgeRoutes = new Elysia({ prefix: "/api/knowledge" })
@@ -68,7 +68,7 @@ export const knowledgeRoutes = new Elysia({ prefix: "/api/knowledge" })
     "/docs/playbook/reindex",
     async ({ agent }) => {
       managerOnly(agent.role);
-      return ingestPlaybook();
+      return ingestOrgDocs();
     },
     { authed: true },
   )

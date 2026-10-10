@@ -15,6 +15,7 @@ import {
 import { agents, calls, currentAgent } from "./calls";
 import { knowledgeSnippets, knowledgeSources } from "./knowledge";
 import { LIVE_CALL_ID, LIVE_PERSONA_ID, liveCall, liveCallTimeline, liveCallTranscript, liveCallTranslations } from "./live-call";
+import { THALI_CALL_ID, thaliCallTranscript, thaliCallTranslations, thaliScorecard, thaliVoiced, thaliWorkspaceLog } from "./history";
 import { merchants } from "./merchants";
 import { PERSONA_PRESETS, personas, VOICES } from "./personas";
 import { DEFAULT_POLICIES, MAX_GROW_POLICIES, maxGrowOutbound, scenarios } from "./scenarios";
@@ -45,7 +46,7 @@ if (new Set(merchants.map((m) => m.uid)).size !== merchants.length) throw new Er
 z.array(scenarioSchema).parse(scenarios);
 z.array(callSchema).parse(calls);
 z.array(scorecardSchema).parse(scorecards);
-z.array(transcriptTurnSchema).parse([...simCallTranscript, ...liveCallTranscript]);
+z.array(transcriptTurnSchema).parse([...simCallTranscript, ...liveCallTranscript, ...thaliCallTranscript]);
 for (const { event } of [...simRingTimeline, ...simCallTimeline, ...simWrapUpTimeline]) simServerMessageSchema.parse(event);
 for (const { event } of liveCallTimeline) liveEventSchema.parse(event);
 
@@ -55,6 +56,7 @@ const withTranslations = (turns: typeof simCallTranscript, tr: Record<string, st
 export const transcripts: Record<string, typeof simCallTranscript> = {
   [SIM_CALL_ID]: withTranslations(simCallTranscript, simCallTranslations),
   [LIVE_CALL_ID]: withTranslations(liveCallTranscript, liveCallTranslations),
+  [THALI_CALL_ID]: withTranslations(thaliCallTranscript, thaliCallTranslations),
 };
 
 export * from "./merchants";
@@ -87,5 +89,11 @@ export {
   simRingTimeline,
   simScorecard,
   simWrapUpTimeline,
+  THALI_CALL_ID,
+  thaliCallTranscript,
+  thaliCallTranslations,
+  thaliScorecard,
+  thaliVoiced,
+  thaliWorkspaceLog,
   VOICES,
 };

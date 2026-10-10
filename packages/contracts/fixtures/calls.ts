@@ -1,4 +1,5 @@
 import type { Agent, Call } from "../src";
+import { THALI_CALL_ID } from "./history";
 import { LIVE_CALL_ID, liveCall } from "./live-call";
 import { SIM_CALL_ID } from "./sim-call";
 
@@ -73,7 +74,7 @@ export const calls: Call[] = [
   },
   {
     ...base,
-    id: "call_sim_thali",
+    id: THALI_CALL_ID,
     kind: "sim",
     status: "scored",
     personaId: "persona_bargainer",
@@ -82,9 +83,9 @@ export const calls: Call[] = [
     language: "hinglish",
     customerLabel: "Hitesh Patel · Royal Thali House",
     startedAt: "2026-10-09T15:00:00.000Z",
-    endedAt: "2026-10-09T15:05:10.000Z",
-    durationMs: 310000,
-    overallScore: 84,
+    endedAt: "2026-10-09T15:01:07.000Z",
+    durationMs: 67000,
+    overallScore: 17,
   },
   {
     ...base,

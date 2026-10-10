@@ -1,4 +1,4 @@
-import type { Scenario } from "@onfloor/contracts";
+import { type Scenario, scenarioSchema } from "@onfloor/contracts";
 import { scenarios } from "@onfloor/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { Elysia } from "elysia";
@@ -16,7 +16,10 @@ export async function getScenario(id: string): Promise<Scenario> {
 }
 
 export async function listScenarios(): Promise<Scenario[]> {
-  return (await db.select().from(scenarios).orderBy(asc(scenarios.createdAt))).map(toScenario);
+  // Rows written under an older scenario shape are skipped, not served.
+  return (await db.select().from(scenarios).orderBy(asc(scenarios.createdAt)))
+    .map(toScenario)
+    .filter((s) => scenarioSchema.safeParse(s).success);
 }
 
 export async function upsertScenario({ id, ...body }: Scenario) {

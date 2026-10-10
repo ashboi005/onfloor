@@ -1,4 +1,4 @@
-import { CRM_FIELDS, type CreatePersona, type CrmRequest, createPersonaSchema, type Persona, type PersonaSource } from "@onfloor/contracts";
+import { type CreatePersona, type CrmRequest, createPersonaSchema, type Persona, personaSchema, type PersonaSource } from "@onfloor/contracts";
 import { personas } from "@onfloor/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { AppError } from "../../core/errors";
@@ -14,33 +14,27 @@ type Row = typeof personas.$inferSelect;
 const toPersona = (r: Row): Persona => ({ ...r.body, id: r.id, createdAt: r.createdAt.toISOString() });
 
 /**
- * Coerce request values onto the CRM's actual field types (LLM extraction says
- * "Premium" for the `premium` enum, "50,000" for a number…). Unusable requests are dropped,
- * since a request the agent can't possibly satisfy would only corrupt the CRM audit.
+ * Coerce request values onto the formats the tools audit expects (LLM extraction says
+ * "two months" for duration "2", "tomorrow 4pm" for a callback…). Unusable requests are dropped,
+ * since a request the agent can't possibly satisfy would only corrupt the audit.
  */
 export function normalizeCrmRequests(requests: CrmRequest[]): CrmRequest[] {
   const out: CrmRequest[] = [];
   for (const r of requests) {
-    const def = CRM_FIELDS[r.field];
-    let value: unknown = r.value;
-    if (def.type === "number") {
-      const n = typeof value === "number" ? value : Number(String(value).replace(/[^\d.-]/g, ""));
-      if (!Number.isFinite(n)) continue;
-      value = Math.min(def.max, Math.max(def.min, Math.round(n)));
-    } else if (def.type === "boolean") {
-      if (typeof value !== "boolean") value = /^(true|on|yes|enabled?)$/i.test(String(value).trim());
-    } else if (def.type === "enum") {
-      const match = def.values.find((v) => v === String(value).trim().toLowerCase().replace(/[\s-]+/g, "_"));
-      if (!match) continue;
-      value = match;
-    } else if (def.type === "multi") {
-      const vals = (Array.isArray(value) ? value : [value]).map((v) => String(v).trim().toLowerCase().replace(/[\s-]+/g, "_"));
-      value = def.values.filter((v) => vals.includes(v));
-      if (!(value as string[]).length) continue;
-    } else {
-      value = String(value);
+    const v = String(r.value ?? "").trim();
+    let value: string | null = null;
+    if (r.kind === "email_update") {
+      value = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? v.toLowerCase() : null;
+    } else if (r.kind === "start_date") {
+      value = /^\+\d{1,2}$|^\d{4}-\d{2}-\d{2}$/.test(v) ? v : /^\d{1,2}$/.test(v) ? `+${v}` : null;
+    } else if (r.kind === "duration") {
+      const n = Number.parseInt(v, 10);
+      value = Number.isFinite(n) && n >= 1 && n <= 12 ? String(n) : null;
+    } else if (r.kind === "callback") {
+      const m = v.match(/^(\+\d{1,2}|\d{4}-\d{2}-\d{2})\s+([01]?\d|2[0-3]):([0-5]\d)$/);
+      value = m ? `${m[1]} ${m[2]!.padStart(2, "0")}:${m[3]}` : null;
     }
-    out.push({ ...r, value });
+    if (value !== null) out.push({ ...r, value });
   }
   return out;
 }
@@ -79,5 +73,6 @@ export async function listPersonas(source?: PersonaSource): Promise<Persona[]> {
     .from(personas)
     .where(source ? eq(personas.source, source) : undefined)
     .orderBy(desc(personas.createdAt));
-  return rows.map(toPersona);
+  // Rows written under an older persona shape (e.g. the pre-Tomato CRM requests) are skipped.
+  return rows.map(toPersona).filter((p) => personaSchema.safeParse(p).success);
 }

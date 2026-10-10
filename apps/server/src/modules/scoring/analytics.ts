@@ -1,4 +1,19 @@
-import type { CrmAuditRow, CrmRequest, Scorecard, TranscriptTurn } from "@onfloor/contracts";
+import {
+  addMonths,
+  type CallbackSlot,
+  type CampaignDraft,
+  type CrmAuditRow,
+  type CrmRequest,
+  type Disposition,
+  DISPOSITION_TEMPLATE,
+  type EmailTemplateId,
+  MAX_GROW,
+  type Merchant,
+  resolveRequest,
+  type Scorecard,
+  type TranscriptTurn,
+  type WorkspaceLogEntry,
+} from "@onfloor/contracts";
 
 /**
  * Everything countable about a call, computed (never asked of the LLM), so it is
@@ -50,45 +65,125 @@ export function computeStats(turns: TranscriptTurn[], durationMs: number | null)
   };
 }
 
-export function sameValue(a: unknown, b: unknown): boolean {
-  if (Array.isArray(a) && Array.isArray(b)) return JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
-  return a === b;
-}
-
-export interface CrmLog {
-  actions: { field: string; to: unknown; atMs: number }[];
+export interface WorkspaceLog {
+  actions: WorkspaceLogEntry[];
   voiced: { requestId: string; atMs: number }[];
 }
 
-/** One row per request the persona actually voiced: final value vs expected, and time to action it. */
-export function crmAudit(requests: CrmRequest[], initial: Record<string, unknown>, log: CrmLog): CrmAuditRow[] {
-  const rows: CrmAuditRow[] = [];
-  for (const v of log.voiced) {
-    const req = requests.find((r) => r.id === v.requestId);
-    if (!req || rows.some((r) => r.requestId === req.id)) continue;
-    const forField = log.actions.filter((a) => a.field === req.field);
-    const actual = forField.length ? forField.at(-1)!.to : initial[req.field];
-    const firstHit = forField.find((a) => a.atMs >= v.atMs - 2000 && sameValue(a.to, req.value));
-    rows.push({
-      requestId: req.id,
-      field: req.field,
-      expected: req.value,
-      actual,
-      correct: sameValue(actual, req.value),
-      latencyMs: firstHit ? Math.max(0, firstHit.atMs - v.atMs) : null,
-    });
-  }
-  return rows;
+export interface WorkspaceAuditInput {
+  merchant: Merchant;
+  requests: CrmRequest[];
+  callDate: string;
+  dispositionSec: number;
+  log: WorkspaceLog;
 }
 
-/** 70% correctness + 30% speed. null when the persona voiced no requests. */
+export interface WorkspaceAudit {
+  rows: CrmAuditRow[];
+  wrapUp: NonNullable<Scorecard["wrapUp"]>;
+  /** The successful Ad Studio launch the audit judged (the last one). */
+  campaign: CampaignDraft | null;
+  failedLaunches: string[];
+  lateDisposition: boolean;
+}
+
+const row = (requestId: string, field: string, expected: unknown, actual: unknown, correct: boolean, latencyMs: number | null = null): CrmAuditRow => ({
+  requestId,
+  field,
+  expected,
+  actual,
+  correct,
+  latencyMs,
+});
+
+/**
+ * Replays a sim call's workspace log against what should have happened: the customer's identity
+ * and data (merchant), what they asked for (voiced requests) and what they decided (persona decision).
+ * Every row is a checkable fact; nothing here is judged by the LLM.
+ */
+export function workspaceAudit({ merchant, requests, callDate, dispositionSec, log }: WorkspaceAuditInput): WorkspaceAudit {
+  const rows: CrmAuditRow[] = [];
+  const of = (kind: string) => log.actions.filter((a) => a.actor === "agent" && a.kind === kind);
+  const voiced = (kind: CrmRequest["kind"]) => {
+    const r = requests.find((q) => q.kind === kind && log.voiced.some((v) => v.requestId === q.id));
+    return r ? { request: r, at: log.voiced.find((v) => v.requestId === r.id)!.atMs, value: resolveRequest(r, callDate) } : null;
+  };
+  const decision = (log.actions.find((a) => a.actor === "persona" && a.kind === "decision")?.body.value as Disposition | undefined) ?? null;
+
+  // Merchant Dashboard: the decision maker's account looked up with the ticket's UID.
+  const lookups = of("dashboard_lookup");
+  const hit = lookups.find((a) => a.body.matchesTicket === true);
+  if (merchant.answerer.isDecisionMaker || lookups.length) {
+    rows.push(row("lookup", "Merchant Dashboard · UID looked up", merchant.uid, hit ? merchant.uid : (lookups.at(-1)?.body.uid ?? "not looked up"), !!hit, hit?.atMs ?? null));
+  }
+
+  // Ad Studio: judged on the last successful launch.
+  const launches = of("campaign_launch");
+  const okLaunch = launches.filter((a) => a.body.ok === true).at(-1);
+  const campaign = (okLaunch?.body.campaign as CampaignDraft | undefined) ?? null;
+  const failedLaunches = launches.filter((a) => a.body.ok !== true).map((a) => String(a.body.error ?? "rejected"));
+  if (decision === "accepted" && !campaign) rows.push(row("campaign_launched", "Ad Studio · campaign launched", "launched", "not launched", false));
+  if (campaign && decision && decision !== "accepted") {
+    rows.push(row("campaign_unwanted", "Ad Studio · campaign only if they agreed", `no campaign (customer: ${decision})`, "launched", false));
+  }
+  if (campaign) {
+    const email = voiced("email_update");
+    const start = voiced("start_date");
+    const months = voiced("duration");
+    const expectedEmail = email?.value.email ?? merchant.email.toLowerCase();
+    const expectedStart = start?.value.date ?? callDate;
+    rows.push(row("campaign_uid", "Ad Studio · UID", merchant.uid, campaign.uid, campaign.uid === merchant.uid));
+    rows.push(
+      row(
+        email?.request.id ?? "campaign_email",
+        email ? "Ad Studio · email (updated on the call)" : "Ad Studio · email",
+        expectedEmail,
+        campaign.email,
+        campaign.email.toLowerCase() === expectedEmail,
+        email && okLaunch ? Math.max(0, okLaunch.atMs - email.at) : null,
+      ),
+    );
+    rows.push(row("campaign_type", "Ad Studio · campaign", "max_grow", campaign.campaignType, campaign.campaignType === "max_grow"));
+    rows.push(row(start?.request.id ?? "campaign_start", start ? "Ad Studio · start date (asked on the call)" : "Ad Studio · start date", expectedStart, campaign.startDate, campaign.startDate === expectedStart));
+    if (months) {
+      const end = addMonths(campaign.startDate, months.value.months!);
+      rows.push(row(months.request.id, `Ad Studio · end date (${months.value.months} months, asked on the call)`, end, campaign.endDate, campaign.endDate === end));
+    } else {
+      const min = addMonths(campaign.startDate, MAX_GROW.minDurationMonths);
+      rows.push(row("campaign_end", "Ad Studio · end date (min 1 month)", `≥ ${min}`, campaign.endDate, campaign.endDate >= min));
+    }
+  }
+
+  // Nugget: email template + disposition, within the window.
+  const dispose = of("dispose").at(-1);
+  const outcome = (dispose?.body.outcome as Disposition | undefined) ?? null;
+  const callback = (dispose?.body.callback as CallbackSlot | null | undefined) ?? null;
+  const secondsTaken = typeof dispose?.body.secondsTaken === "number" ? dispose.body.secondsTaken : null;
+  const withinLimit = secondsTaken !== null && secondsTaken <= dispositionSec;
+  const emailTemplate = (of("email_sent").at(-1)?.body.template as EmailTemplateId | undefined) ?? null;
+
+  if (decision) rows.push(row("disposition_outcome", "Nugget · disposition", decision, outcome ?? "not disposed", outcome === decision));
+  const expectedTemplate = DISPOSITION_TEMPLATE[decision ?? outcome ?? "not_interested"];
+  rows.push(row("email_template", "Nugget · email template", expectedTemplate, emailTemplate ?? "none sent", emailTemplate === expectedTemplate));
+  if (decision === "callback" || outcome === "callback") {
+    const asked = voiced("callback");
+    const want = asked ? `${asked.value.date} ${asked.value.time}` : "any slot";
+    const got = callback ? `${callback.date} ${callback.time}` : "none";
+    rows.push(row(asked?.request.id ?? "callback_slot", asked ? "Nugget · callback slot (asked on the call)" : "Nugget · callback slot", want, got, asked ? got === want : !!callback));
+  }
+  rows.push(row("disposition_time", `Nugget · disposed within ${dispositionSec}s`, `≤ ${dispositionSec}s`, secondsTaken === null ? "not disposed" : `${secondsTaken}s`, withinLimit, secondsTaken === null ? null : secondsTaken * 1000));
+
+  return {
+    rows,
+    campaign,
+    failedLaunches,
+    lateDisposition: !withinLimit,
+    wrapUp: { outcome, emailTemplate, callback, secondsTaken, withinLimit, customerDecision: decision },
+  };
+}
+
+/** Share of checks done right. null when there was nothing to check. */
 export function toolAccuracyScore(rows: CrmAuditRow[]): number | null {
   if (!rows.length) return null;
-  const correct = rows.filter((r) => r.correct).length / rows.length;
-  const speed =
-    rows.reduce((s, r) => {
-      if (r.latencyMs === null) return s;
-      return s + (r.latencyMs <= 5000 ? 1 : r.latencyMs <= 15_000 ? 0.7 : r.latencyMs <= 30_000 ? 0.4 : 0.1);
-    }, 0) / rows.length;
-  return Math.round(70 * correct + 30 * speed);
+  return Math.round((100 * rows.filter((r) => r.correct).length) / rows.length);
 }

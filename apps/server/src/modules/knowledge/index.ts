@@ -1,3 +1,4 @@
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { LiveEvent, Scorecard } from "@onfloor/contracts";
 import { calls } from "../../core/calls";
@@ -18,8 +19,10 @@ import type { Snippet } from "../../core/services/knowledge";
  * must never break one.
  */
 
-export const PLAYBOOK_SOURCE = "playbook";
-const PLAYBOOK_PATH = join(import.meta.dir, "../../../knowledge/onfloor-ads-playbook.md");
+/** Bundled company docs (apps/server/knowledge/*.md → org_docs) and seed golden lines (knowledge/golden/*.md). */
+const KNOWLEDGE_DIR = join(import.meta.dir, "../../../knowledge");
+/** Bundled docs that no longer exist (the pre-Tomato placeholder playbook). Add a source here when you delete its file. */
+const RETIRED_DOC_SOURCES = ["playbook"];
 
 /**
  * Hard ceiling on any RAG lookup. Callers sit on latency-sensitive paths (live call start,
@@ -45,16 +48,52 @@ const safe = async <T>(fallback: T, run: () => Promise<T>, timeoutMs = RAG_TIMEO
   }
 };
 
-/** Ingest (or refresh) the bundled OnFloor Ads playbook into org_docs. */
-export async function ingestPlaybook() {
-  const text = await Bun.file(PLAYBOOK_PATH).text();
-  return services.knowledge.ingest({
-    scope: { kind: "org_docs" },
-    source: PLAYBOOK_SOURCE,
-    title: "OnFloor Ads playbook",
-    text,
-    format: "markdown",
-  });
+/**
+ * Ingest (or refresh) every bundled company doc into org_docs, one source per file
+ * (source = file name, title = its first heading). Previously bundled docs that were retired
+ * (RETIRED_DOC_SOURCES) are removed, so a changed demo company leaves no stale facts behind.
+ * Docs a manager uploaded are never touched.
+ */
+export async function ingestOrgDocs(): Promise<{ docs: { source: string; chunks: number }[]; removed: string[] }> {
+  const files = (await readdir(KNOWLEDGE_DIR)).filter((f) => f.endsWith(".md")).sort();
+  const docs: { source: string; chunks: number }[] = [];
+  for (const file of files) {
+    const text = await Bun.file(join(KNOWLEDGE_DIR, file)).text();
+    const source = file.replace(/\.md$/, "");
+    const title = text.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? source;
+    const { chunks } = await services.knowledge.ingest({ scope: { kind: "org_docs" }, source, title, text, format: "markdown" });
+    docs.push({ source, chunks });
+  }
+  const bundled = new Set(docs.map((d) => d.source));
+  const removed: string[] = [];
+  for (const s of await services.knowledge.sources("org_docs")) {
+    if (bundled.has(s.source) || !RETIRED_DOC_SOURCES.includes(s.source)) continue;
+    await services.knowledge.remove({ kind: "org_docs" }, s.source);
+    removed.push(s.source);
+  }
+  return { docs, removed };
+}
+
+/** Seed "top-rep" lines (knowledge/golden/*.md, examples separated by ---) into the golden scope. */
+export async function ingestGoldenSeed(): Promise<number> {
+  const dir = join(KNOWLEDGE_DIR, "golden");
+  let n = 0;
+  for (const file of (await readdir(dir).catch(() => [] as string[])).filter((f) => f.endsWith(".md"))) {
+    const examples = (await Bun.file(join(dir, file)).text()).split(/^---$/m).map((e) => e.trim()).filter(Boolean);
+    for (const [i, text] of examples.entries()) {
+      const why = text.match(/Why it worked:\s*(.+)/)?.[1] ?? "Top-rep line";
+      await services.knowledge.ingest({
+        scope: { kind: "golden" },
+        source: `seed:${file.replace(/\.md$/, "")}:${i + 1}`,
+        title: `Top-rep line: ${why.split(/[,.]/)[0]}`,
+        text,
+        format: "snippet",
+        meta: { seed: true },
+      });
+      n++;
+    }
+  }
+  return n;
 }
 
 // --- Retrieval helpers (used by sim, scoring, and the live copilot) -----------------------

@@ -1,5 +1,5 @@
-import type { Call, CallKind, CallStatus, CallWithTranscript, CrmAction, Language, TranscriptTurn } from "@onfloor/contracts";
-import { calls as callsTable, crmActions, crmRequestsVoiced, transcriptTurns } from "@onfloor/db/schema";
+import type { Call, CallKind, CallStatus, CallWithTranscript, Language, TranscriptTurn, WorkspaceLogEntry } from "@onfloor/contracts";
+import { calls as callsTable, crmRequestsVoiced, transcriptTurns, workspaceActions } from "@onfloor/db/schema";
 import { and, asc, desc, eq, max } from "drizzle-orm";
 import { db } from "../services";
 import { AppError } from "./errors";
@@ -20,6 +20,8 @@ export function toCall(r: CallRow): Call {
     agentId: r.agentId,
     scenarioId: r.scenarioId,
     personaId: r.personaId,
+    merchantId: r.merchantId,
+    guidance: r.guidance,
     replayOfCallId: r.replayOfCallId,
     language: r.language,
     customerLabel: r.customerLabel,
@@ -52,6 +54,8 @@ export interface CreateCallInput {
   customerLabel: string;
   scenarioId?: string | null;
   personaId?: string | null;
+  merchantId?: string | null;
+  guidance?: boolean;
   replayOfCallId?: string | null;
   externalCustomerId?: string | null;
 }
@@ -153,6 +157,11 @@ export const calls = {
     return row?.id ?? null;
   },
 
+  /** Sim: the agent picked up. The call clock (and durationMs) starts here, not at dialling. */
+  async markConnected(callId: string) {
+    await db.update(callsTable).set({ startedAt: new Date() }).where(eq(callsTable.id, callId));
+  },
+
   async end(callId: string, status: CallStatus = "scoring"): Promise<Call> {
     const call = await calls.get(callId);
     const endedAt = new Date();
@@ -179,21 +188,24 @@ export const calls = {
     await db.update(callsTable).set({ recordingUrl }).where(eq(callsTable.id, callId));
   },
 
-  // --- Sim CRM tracking --------------------------------------------------------
+  // --- Sim workspace tracking (Nugget / Merchant Dashboard / Ad Studio) ---------
 
-  async recordCrmAction(callId: string, action: CrmAction) {
-    await db.insert(crmActions).values({ callId, ...action });
+  async recordWorkspace(callId: string, entry: WorkspaceLogEntry) {
+    await db.insert(workspaceActions).values({ callId, ...entry });
   },
 
   async recordCrmRequestVoiced(callId: string, requestId: string, atMs: number) {
     await db.insert(crmRequestsVoiced).values({ callId, requestId, atMs });
   },
 
-  async crmLog(callId: string) {
+  async workspaceLog(callId: string): Promise<{ actions: WorkspaceLogEntry[]; voiced: { requestId: string; atMs: number }[] }> {
     const [actions, voiced] = await Promise.all([
-      db.select().from(crmActions).where(eq(crmActions.callId, callId)).orderBy(asc(crmActions.atMs)),
+      db.select().from(workspaceActions).where(eq(workspaceActions.callId, callId)).orderBy(asc(workspaceActions.atMs), asc(workspaceActions.id)),
       db.select().from(crmRequestsVoiced).where(eq(crmRequestsVoiced.callId, callId)),
     ]);
-    return { actions, voiced };
+    return {
+      actions: actions.map(({ actor, kind, body, atMs }) => ({ actor, kind, body, atMs })),
+      voiced: voiced.map(({ requestId, atMs }) => ({ requestId, atMs })),
+    };
   },
 };
