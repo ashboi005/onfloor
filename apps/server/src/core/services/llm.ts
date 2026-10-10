@@ -123,8 +123,6 @@ async function complete(
   responseFormat?: { name: string; schema: unknown },
 ): Promise<string> {
   const cfg = providers()[provider];
-  const pool = pools()[provider];
-  if (!pool.size) throw new AppError("LLM_UNAVAILABLE", { message: `${provider} has no API key configured.` });
   const tier = input.tier ?? DEFAULT_TIER[input.job];
   const model = cfg.models[tier];
   const body = JSON.stringify({
@@ -141,40 +139,86 @@ async function complete(
     }),
   });
 
-  // Rotate through the provider's keys: a key that 429s/503s cools down and the same
-  // request moves straight on to the next healthy one (see key-pool.ts for the policy).
+  const res = await withKeyRotation(provider, model, (key) =>
+    fetch(`${cfg.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(input.timeoutMs ?? 60_000),
+      body,
+    }),
+  );
+  const parsed = completionSchema.safeParse(await res.json());
+  const content = parsed.success ? parsed.data.choices[0]?.message.content : null;
+  if (!content?.trim()) throw new AppError("LLM_FAILED", { cause: new Error(`${provider}/${model} returned no text`) });
+  return content;
+}
+
+/**
+ * Sends one request through the provider's key pool: a key that 429s/503s/is invalid cools
+ * down (per model) and the same request moves straight on to the next healthy key (see
+ * key-pool.ts). Returns the first OK response; an exhausted pool always surfaces as a 429 so
+ * the provider-level fallback can run.
+ */
+async function withKeyRotation(
+  provider: LlmProvider,
+  model: string,
+  send: (key: string) => Promise<Response>,
+): Promise<Response> {
+  const pool = pools()[provider];
+  if (!pool.size) throw new AppError("LLM_UNAVAILABLE", { message: `${provider} has no API key configured.` });
   const tried = new Set<PooledKey>();
   let lastError: HttpError | null = null;
   for (let attempt = 0; attempt < pool.size; attempt++) {
     const k = pool.next(model, tried);
     if (!k) break;
     tried.add(k);
-    const res = await fetch(`${cfg.baseUrl.replace(/\/$/, "")}/chat/completions`, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${k.key}` },
-      signal: AbortSignal.timeout(input.timeoutMs ?? 60_000),
-      body,
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      lastError = new HttpError(res.status, text);
-      const cooldown = cooldownFor(res.status, text);
-      if (!cooldown) throw lastError;
-      pool.cool(k, model, cooldown);
-      if (!cooldown.rotate) break;
-      continue;
-    }
-    const parsed = completionSchema.safeParse(await res.json());
-    const content = parsed.success ? parsed.data.choices[0]?.message.content : null;
-    if (!content?.trim()) throw new AppError("LLM_FAILED", { cause: new Error(`${provider}/${model} returned no text`) });
-    return content;
+    const res = await send(k.key);
+    if (res.ok) return res;
+    const text = await res.text().catch(() => "");
+    lastError = new HttpError(res.status, text);
+    const cooldown = cooldownFor(res.status, text);
+    if (!cooldown) throw lastError;
+    pool.cool(k, model, cooldown);
+    if (!cooldown.rotate) break;
   }
-  // Every key is cooling or just failed in a cooldown-worthy way: always surface it as a 429,
-  // whatever the last key's own status was, so the provider-level fallback runs.
   throw new HttpError(
     429,
     `${provider}: all ${pool.size} keys cooling down (${model}; next in ${Math.round(pool.soonestMs(model) / 1000)}s)${lastError ? `; last: ${lastError.message.slice(0, 120)}` : ""}`,
   );
+}
+
+const embeddingSchema = z.object({ data: z.array(z.object({ embedding: z.array(z.number()), index: z.number().optional() })) });
+const EMBED_BATCH = 32;
+
+/**
+ * Text → vectors for RAG. Always Gemini (`EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS`) through the
+ * key pool, with ONE backoff retry, and never another provider: vectors from different models
+ * can't share a collection.
+ */
+export async function embed(texts: string[]): Promise<number[][]> {
+  const out: number[][] = [];
+  for (let i = 0; i < texts.length; i += EMBED_BATCH) {
+    const batch = texts.slice(i, i + EMBED_BATCH);
+    const send = (key: string) =>
+      fetch(`${ENV.GEMINI_BASE_URL.replace(/\/$/, "")}/embeddings`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+        signal: AbortSignal.timeout(30_000),
+        body: JSON.stringify({ model: ENV.EMBEDDING_MODEL, input: batch, dimensions: ENV.EMBEDDING_DIMENSIONS }),
+      });
+    let res: Response;
+    try {
+      res = await withKeyRotation("gemini", ENV.EMBEDDING_MODEL, send);
+    } catch (e) {
+      if (!retryable(e)) throw e;
+      await Bun.sleep(1500);
+      res = await withKeyRotation("gemini", ENV.EMBEDDING_MODEL, send);
+    }
+    const parsed = embeddingSchema.parse(await res.json());
+    const sorted = [...parsed.data].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+    for (const d of sorted) out.push(d.embedding);
+  }
+  return out;
 }
 
 const retryable = (e: unknown) => e instanceof HttpError && (e.status === 429 || e.status >= 500);

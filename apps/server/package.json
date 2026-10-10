@@ -15,15 +15,17 @@
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.2",
+    "@mastra/qdrant": "^1.1.4",
+    "@mastra/rag": "^2.6.6",
     "@onfloor/auth": "workspace:*",
+    "@onfloor/contracts": "workspace:*",
     "@onfloor/db": "workspace:*",
     "@sinclair/typebox": "^0.34.52",
     "better-auth": "catalog:",
+    "drizzle-orm": "catalog:",
     "elysia": "^1.4.30",
     "varlock": "catalog:",
-    "zod": "catalog:",
-    "@onfloor/contracts": "workspace:*",
-    "drizzle-orm": "catalog:"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@onfloor/config": "workspace:*",

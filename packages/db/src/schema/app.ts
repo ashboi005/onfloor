@@ -138,3 +138,23 @@ export const liveEvents = pgTable(
   },
   (t) => [index("live_events_call_idx").on(t.callId, t.atMs)],
 );
+
+/**
+ * Registry of what's in the vector store (Qdrant has no cheap "list sources"). One row per
+ * ingested source per scope; re-ingesting a source replaces its chunks.
+ */
+export const knowledgeSources = pgTable(
+  "knowledge_sources",
+  {
+    id: serial("id").primaryKey(),
+    /** org_docs | customer | agent | golden */
+    scope: text("scope").notNull(),
+    /** customerKey / agentId; "" for org_docs and golden. */
+    scopeKey: text("scope_key").notNull().default(""),
+    source: text("source").notNull(),
+    title: text("title").notNull(),
+    chunks: integer("chunks").notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("knowledge_sources_scope_source_idx").on(t.scope, t.scopeKey, t.source)],
+);
