@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 import { services } from "../core/services";
-import { type LlmJob, providerFor } from "../core/services/llm";
+import { type LlmJob, llmKeyStatus, providerFor } from "../core/services/llm";
 import { ENV } from "../env.server";
 
 for (const [name, base, key] of [
@@ -18,6 +18,19 @@ for (const [name, base, key] of [
   const res = await fetch(`${base.replace(/\/$/, "")}/models`, { headers: { authorization: `Bearer ${key}` } });
   const body = (await res.json().catch(() => null)) as { data?: { id: string }[] } | null;
   console.log(`${name}: /models ${res.status}, ${body?.data?.length ?? "?"} models`);
+}
+
+// Each Gemini key on its own (quota is per Google Cloud project, so each should answer).
+const geminiKeys = [ENV.GEMINI_API_KEY, ENV.GEMINI_API_KEY_2, ENV.GEMINI_API_KEY_3, ENV.GEMINI_API_KEY_4];
+for (const [i, key] of geminiKeys.entries()) {
+  if (!key) continue;
+  const t = performance.now();
+  const res = await fetch(`${ENV.GEMINI_BASE_URL.replace(/\/$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+    body: JSON.stringify({ model: ENV.GEMINI_MODEL_FAST, max_tokens: 5, messages: [{ role: "user", content: "hi" }] }),
+  });
+  console.log(`gemini#${i + 1}: ${res.status} ${Math.round(performance.now() - t)}ms${res.ok ? "" : ` ${(await res.text()).slice(0, 120)}`}`);
 }
 
 for (const job of ["roleplay", "copilot", "scoring", "persona"] as LlmJob[]) {
@@ -39,4 +52,5 @@ for (const job of ["roleplay", "copilot", "scoring", "persona"] as LlmJob[]) {
     console.log(`${job.padEnd(9)} ${providerFor(job).padEnd(7)} FAILED ${(e as Error).message}`, (e as Error).cause ?? "");
   }
 }
+console.log("key pools:", JSON.stringify(llmKeyStatus()));
 process.exit(0);

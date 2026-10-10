@@ -54,7 +54,8 @@ WebSockets and runs them through the real DB → scoring → persona path. `POST
 | Piece | State |
 |---|---|
 | Auth, DB (migrated + seeded on the shared DB), all REST routes, both WebSockets, live hub | ✅ real |
-| LLM toggle: Gemini now (Merge key pending: `zai/glm-5.3-flash`), per-job, 429/5xx retry | ✅ real. `bun run llm:check` |
+| LLM toggle: Gemini + Merge (`zai/glm-5.3-flash`), per-job, Merge fallback | ✅ real. `bun run llm:check` |
+| Gemini key rotation: up to 4 keys (`GEMINI_API_KEY`, `_2`…`_4`), round-robin per call, per-key-per-model cooldowns on 429/503/invalid | ✅ real. Key health in `GET /health` |
 | TTS: ElevenLabs + Sarvam by voiceId prefix | ✅ real |
 | Simulator engine: persona LLM, CRM requests, patience, dead air, barge-in, limits | ✅ real |
 | `useSimCall`: mic → ElevenLabs realtime STT, persona playback, barge-in, echo filter | ✅ real (verify in a browser) |

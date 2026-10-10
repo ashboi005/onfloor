@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authGuard } from "./core/auth-guard";
 import { errorPlugin } from "./core/errors";
 import { services } from "./core/services";
+import { llmKeyStatus } from "./core/services/llm";
 import { ENV } from "./env.server";
 import { callRoutes } from "./modules/calls/routes";
 import { liveRoutes } from "./modules/live/routes";
@@ -46,6 +47,9 @@ const app = new Elysia({ websocket: { idleTimeout: 960 } })
     ok: true,
     stubEngines: ENV.STUB_ENGINES,
     llmProvider: ENV.LLM_PROVIDER,
+    llmKeys: Object.fromEntries(
+      Object.entries(llmKeyStatus()).map(([p, s]) => [p, { total: s.total, healthy: s.healthy }]),
+    ),
     integrations: {
       merge: Boolean(ENV.MERGE_API_KEY),
       gemini: Boolean(ENV.GEMINI_API_KEY),
