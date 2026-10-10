@@ -48,6 +48,8 @@ export const liveEventSchema = z.discriminatedUnion("type", [
   /** In-flight text; overwrite per speaker. */
   z.object({ type: z.literal("transcript_partial"), speaker: z.enum(SPEAKERS), text: z.string() }),
   z.object({ type: z.literal("transcript_final"), turn: transcriptTurnSchema }),
+  /** The English subtitle for an earlier final (arrives after it, Hindi/Hinglish calls). */
+  z.object({ type: z.literal("transcript_translation"), turnId: z.string(), translation: z.string() }),
   z.object({ type: z.literal("hint"), hint: hintSchema }),
   z.object({ type: z.literal("guardrail"), alert: guardrailAlertSchema }),
   z.object({

@@ -31,6 +31,17 @@ const LANGUAGE_INSTRUCTION: Record<Language, string> = {
 This text is read aloud by a speech engine that pronounces Devanagari as Hindi and Roman letters as English, so Hindi in Roman letters comes out mispronounced. This rule is absolute.`,
 };
 
+/**
+ * Tone is driven by `traits.aggression` and applies on top of the archetype: a price-squeezer can
+ * be polite and still hard on price. Default civility: firm, never insulting.
+ */
+function toneRule(aggression: number): string {
+  if (aggression <= 3) return "You are polite and friendly, even when you disagree or say no. Never sarcastic, never rude.";
+  if (aggression <= 6) return "You are firm and direct but civil: no insults, no sarcasm, no mocking the rep. Pressure comes from your arguments, not your manners.";
+  if (aggression <= 8) return "You are blunt and impatient and can be sharp, but never abusive or insulting.";
+  return "You are openly confrontational and hard to please. Still no profanity, slurs or personal insults.";
+}
+
 const PACE: Record<Persona["speechStyle"]["pace"], string> = {
   slow: "You speak unhurriedly.",
   normal: "",
@@ -61,7 +72,8 @@ You are ${p.name}, ${p.role}${p.business.city ? ` in ${p.business.city}` : ""}. 
 ${p.backstory}
 
 ${ARCHETYPE_BEHAVIOUR[p.archetype]}
-Patience ${level(p.traits.patience)}, aggression ${level(p.traits.aggression)}, price sensitivity ${level(p.traits.priceSensitivity)}, talkativeness ${level(p.traits.talkativeness)}. ${PACE[p.speechStyle.pace]}${
+Patience ${level(p.traits.patience)}, aggression ${level(p.traits.aggression)}, price sensitivity ${level(p.traits.priceSensitivity)}, talkativeness ${level(p.traits.talkativeness)}. ${PACE[p.speechStyle.pace]}
+Tone: ${toneRule(p.traits.aggression)}${
     p.speechStyle.interrupts ? " You interrupt people who talk too long." : ""
   }${list("What you actually want", p.goals)}${list("Objections you raise, one at a time, when relevant", p.objections)}${list(
     "Your tactics",
@@ -97,7 +109,7 @@ On the exact reply where you first ask for a change, end it with <crm_request id
 
 # Patience
 
-Each rep message comes with a call note giving your current patience (0-100). Let it drive your tone: above 60 open, 30-60 curt, below 30 openly annoyed and threatening to hang up.
+Each rep message comes with a call note giving your current patience (0-100). Let it drive how engaged you are: above 60 open, 30-60 short and to the point, below 30 visibly losing interest and ready to end the call. Your tone rule above still applies at every patience level.
 After your line, rate how the rep's last message landed: <patience delta="N"/> with N from -20 (dodged, rambled, pushy, wrong) to +15 (direct, helpful, a real answer). Use 0 if neutral.
 If patience reaches 0, or the rep has clearly wasted your time, say a short goodbye line and end with <hang_up/>. If you have agreed to something and the call is done, also say goodbye and end with <hang_up/>.
 

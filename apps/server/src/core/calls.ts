@@ -41,6 +41,7 @@ export function toTurn(r: TurnRow): TranscriptTurn {
     ...(r.language && { language: r.language }),
     startMs: r.startMs,
     endMs: r.endMs,
+    ...(r.translation !== null && { translation: r.translation }),
   };
 }
 
@@ -113,7 +114,10 @@ export const calls = {
     return rows.map(toTurn);
   },
 
-  /** Appends with the next seq. */
+  /**
+   * Appends with the next seq. English turns get their own text as the translation right away;
+   * Hindi/Hinglish turns are translated in the background (modules/translation).
+   */
   async appendTurn(callId: string, turn: Omit<TranscriptTurn, "id" | "callId" | "seq">): Promise<TranscriptTurn> {
     const [agg] = await db
       .select({ seq: max(transcriptTurns.seq) })
@@ -121,12 +125,21 @@ export const calls = {
       .where(eq(transcriptTurns.callId, callId));
     const [row] = await db
       .insert(transcriptTurns)
-      .values({ ...turn, callId, seq: (agg?.seq ?? 0) + 1 })
+      .values({
+        ...turn,
+        callId,
+        seq: (agg?.seq ?? 0) + 1,
+        translation: turn.translation ?? (turn.language === "en" ? turn.text : null),
+      })
       .returning();
     return toTurn(row!);
   },
 
   /** Corrects a turn's end once the real value is known (sim persona playback finished / was cut off). */
+  async setTurnTranslation(turnId: string, translation: string) {
+    await db.update(transcriptTurns).set({ translation }).where(eq(transcriptTurns.id, turnId));
+  },
+
   async setTurnEnd(turnId: string, endMs: number) {
     await db.update(transcriptTurns).set({ endMs }).where(eq(transcriptTurns.id, turnId));
   },

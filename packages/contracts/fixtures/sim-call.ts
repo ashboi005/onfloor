@@ -29,6 +29,21 @@ const t = {
   c5: turn("customer", "15? Hmm. Kitna final karoge? Theek hai, send me the details on WhatsApp.", 72000, 78000),
 };
 
+/** English subtitles for the Hinglish lines (mock: they arrive ~1.5s after each turn). */
+export const simCallTranslations: Record<string, string> = {
+  [t.open.id]: "Yes, go ahead. I have five minutes, tell me the offer quickly.",
+  [t.a1.id]: "Hello Rakesh ji, thanks for your time. This call may be recorded for quality purposes. I wanted to talk about getting your weekends busier.",
+  [t.c1.id]: "Weekends are dead, that's true. But your commission is too high. Zestify is offering me 8%.",
+  [t.a2.id]: t.a2.text,
+  [t.c2.id]: "Fine, make the budget 50,000 a month.",
+  [t.a3.id]: t.a3.text,
+  [t.c3.id]: "And turn off these weekend notifications, they bother my staff.",
+  [t.a4.id]: t.a4.text,
+  [t.c4.id]: "Okay. Now give me 20% off Premium, then we can talk.",
+  [t.a5.id]: t.a5.text,
+  [t.c5.id]: "15? Hmm. What's your final offer? Fine, send me the details on WhatsApp.",
+};
+
 const msg = (atMs: number, event: SimServerMessage): Timed<SimServerMessage> => ({ atMs, event });
 const timer = (ms: number) => msg(ms, { type: "timer", elapsedMs: ms, remainingMs: HARD_LIMIT_MS - ms });
 const say = (tr: TranscriptTurn): Timed<SimServerMessage>[] =>
@@ -41,6 +56,12 @@ const say = (tr: TranscriptTurn): Timed<SimServerMessage>[] =>
         msg(tr.endMs, { type: "persona_state", state: "idle" }),
       ]
     : [msg(tr.endMs, { type: "turn", turn: tr })];
+const subtitle = (tr: TranscriptTurn): Timed<SimServerMessage> =>
+  msg((tr.speaker === "customer" ? tr.startMs : tr.endMs) + 1500, {
+    type: "turn_translation",
+    turnId: tr.id,
+    translation: simCallTranslations[tr.id] ?? tr.text,
+  });
 
 export const simCallTimeline: Timed<SimServerMessage>[] = [
   msg(0, { type: "state", status: "active", elapsedMs: 0 }),
@@ -68,6 +89,9 @@ export const simCallTimeline: Timed<SimServerMessage>[] = [
   timer(75000),
   ...say(t.c5),
   msg(80000, { type: "ended", reason: "persona_hung_up", callId: SIM_CALL_ID }),
+  ...Object.values(t).map(subtitle),
 ].sort((a, b) => a.atMs - b.atMs);
 
 export const simCallTranscript: TranscriptTurn[] = Object.values(t);
+
+

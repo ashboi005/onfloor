@@ -13,6 +13,8 @@ import { playTimeline } from "./timeline";
  *   const live = useLiveCall("active");   // or a specific callId
  *   live.hints, live.guardrails, live.sentiment, live.talk, live.turns, live.partial,
  *   live.customerMemory (RAG: "last time…" items; [] for a first-time caller)
+ *   turn.translation: English subtitle, arrives a bit after the final for Hindi/Hinglish
+ *   (render with `subtitleText(turn, mode)` from "@/lib/subtitles"; partials are raw only)
  *
  * Mock mode replays fixtures/live-call.ts after a short "waiting" period (call
  * `restart()` to replay). Real mode subscribes to /ws/live/:callId and reconnects.
@@ -106,12 +108,17 @@ export function liveReducer(s: LiveCallState, a: Action): LiveCallState {
           return { ...s, customerMemory: e.items };
         case "transcript_partial":
           return { ...s, partial: { ...s.partial, [e.speaker]: e.text } };
-        case "transcript_final":
+        case "transcript_final": {
+          const prev = s.turns.find((t) => t.id === e.turn.id);
+          const turn = prev?.translation && !e.turn.translation ? { ...e.turn, translation: prev.translation } : e.turn;
           return {
             ...s,
-            turns: [...s.turns.filter((t) => t.id !== e.turn.id), e.turn].sort((x, y) => x.seq - y.seq),
+            turns: [...s.turns.filter((t) => t.id !== e.turn.id), turn].sort((x, y) => x.seq - y.seq),
             partial: { ...s.partial, [e.turn.speaker]: "" },
           };
+        }
+        case "transcript_translation":
+          return { ...s, turns: s.turns.map((t) => (t.id === e.turnId ? { ...t, translation: e.translation } : t)) };
         case "hint":
           if (s.hints.some((h) => h.id === e.hint.id)) return s;
           return { ...s, hints: [{ ...e.hint, receivedAt: Date.now(), pinned: false }, ...s.hints] };

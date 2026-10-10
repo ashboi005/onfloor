@@ -82,6 +82,8 @@ export const transcriptTurns = pgTable(
     language: text("language", { enum: LANGUAGES }),
     startMs: integer("start_ms").notNull(),
     endMs: integer("end_ms").notNull(),
+    /** English subtitle (= text for English calls; filled later for Hindi/Hinglish). */
+    translation: text("translation"),
   },
   (t) => [uniqueIndex("transcript_turns_call_seq_idx").on(t.callId, t.seq)],
 );

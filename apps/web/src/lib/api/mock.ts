@@ -75,6 +75,11 @@ export const mockClient: ApiClient = {
     if (!p) throw notFound("persona");
     return delay(p);
   },
+  async createPersona(p) {
+    const persona = { ...p, source: "custom" as const, sourceCallId: null, id: `persona_custom_${Math.random().toString(36).slice(2, 8)}`, createdAt: new Date().toISOString() };
+    personas.unshift(persona);
+    return delay(persona);
+  },
   calls: (kind) => delay(kind ? store.calls.filter((c) => c.kind === kind) : store.calls),
   async call(id) {
     const call = findCall(id);

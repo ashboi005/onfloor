@@ -10,6 +10,7 @@ import { scoreCall } from "../scoring";
 import { customerMemoryEvent } from "../knowledge";
 import { CHUNK_SAMPLES, MAX_SAMPLES } from "./audio";
 import { beginCopilot, endCopilot, onFinal, onPartial, onSpeech } from "./copilot";
+import { translateTurn } from "../translation";
 import { extractPersona } from "./extract-persona";
 import { hub } from "./hub";
 import { CallRecording } from "./recording";
@@ -107,6 +108,8 @@ export function appendLiveTurn(callId: string, input: Omit<TranscriptTurn, "id" 
   const operation = session.writes.then(async () => {
     const turn = await calls.appendTurn(callId, input);
     hub.emit(callId, { type: "transcript_final", turn });
+    // English subtitle (Merge only, may arrive late); English calls already carry it. [added by Ashwath]
+    if (!turn.translation) void translateTurn(turn).then((t) => { if (t && current?.call.id === callId) hub.emit(callId, { type: "transcript_translation", turnId: turn.id, translation: t }); });
     if (session.source === "audio") onFinal(callId, turn);
   });
   session.writes = operation.catch(() => {
@@ -206,7 +209,7 @@ export async function simulateFixtureCall(agentId: string) {
         const { speaker, text, language, startMs, endMs } = event.turn;
         await appendLiveTurn(call.id, { speaker, text, language, startMs, endMs });
       } else if (event.type === "call_ended") { await finishLiveCall(call.id); break; }
-      else if (!["call_started", "customer_memory", "scorecard_ready", "persona_ready"].includes(event.type)) hub.emit(call.id, event as LiveEvent);
+      else if (!["call_started", "customer_memory", "transcript_translation", "scorecard_ready", "persona_ready"].includes(event.type)) hub.emit(call.id, event as LiveEvent);
     }
   })().catch(() => { void finishLiveCall(call.id).catch(() => console.error("[live] fixture finalization failed", call.id)); });
   return { callId: call.id };

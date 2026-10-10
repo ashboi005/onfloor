@@ -8,7 +8,9 @@ import type {
   SimServerMessage,
   SimSessionStart,
   StartSim,
+  TranscriptTurn,
 } from "@onfloor/contracts";
+import { applyPersonaTuning } from "@onfloor/contracts";
 import { SIM_CALL_ID, simCallTimeline } from "@onfloor/contracts/fixtures";
 import { calls } from "../../core/calls";
 import { AppError } from "../../core/errors";
@@ -18,6 +20,7 @@ import type { SynthesizedAudio } from "../../core/services/tts";
 import { replayTimeline, swapId } from "../../core/timeline";
 import { ENV } from "../../env.server";
 import { agentWeakSpots } from "../knowledge";
+import { translateTurn } from "../translation";
 import { getPersona } from "../personas";
 import { getScenario, listScenarios } from "../scenarios";
 import { scoreInBackground } from "../scoring";
@@ -147,7 +150,8 @@ function newSession(
 
 export async function startSim(agent: Agent, input: StartSim): Promise<SimSessionStart> {
   const scenario = await getScenario(input.scenarioId);
-  const persona = await getPersona(input.personaId ?? scenario.defaultPersonaId);
+  // Per-call tweaks from the picker (traits, archetype, pace, voice) on top of the stored persona.
+  const persona = applyPersonaTuning(await getPersona(input.personaId ?? scenario.defaultPersonaId), input.tuning);
   const call = await calls.create({
     kind: "sim",
     agentId: agent.id,
@@ -269,10 +273,19 @@ async function speak(s: Session, text: string) {
   s.speakingTurn = { id: turn.id, startMs };
   broadcast(s, { type: "persona_state", state: "speaking" });
   broadcast(s, { type: "turn", turn });
+  subtitle(s, turn);
   broadcast(s, {
     type: "persona_audio",
     turnId: turn.id,
     audioUrl: audio ? `/api/sim/sessions/${s.callId}/audio/${turn.id}` : "",
+  });
+}
+
+/** English subtitle for a Hindi/Hinglish turn, pushed when Merge returns it (may lag the turn). */
+function subtitle(s: Session, turn: TranscriptTurn) {
+  if (turn.translation) return; // English call: already its own subtitle
+  void translateTurn(turn).then((translation) => {
+    if (translation) broadcast(s, { type: "turn_translation", turnId: turn.id, translation });
   });
 }
 
@@ -386,6 +399,7 @@ async function flushAgent(s: Session, extra?: string) {
     const endMs = parts.at(-1)!.endMs;
     const turn = await calls.appendTurn(s.callId, { speaker: "agent", text, language: s.language, startMs, endMs });
     broadcast(s, { type: "turn", turn });
+    subtitle(s, turn);
     s.history.push({ role: "user", content: text });
     if (endMs - startMs > MONOLOGUE_MS) setPatience(s, s.patience - 10);
   } else if (extra) {

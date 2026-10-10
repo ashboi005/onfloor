@@ -51,3 +51,36 @@ export type Persona = z.infer<typeof personaSchema>;
 
 export const createPersonaSchema = personaSchema.omit({ id: true, createdAt: true });
 export type CreatePersona = z.infer<typeof createPersonaSchema>;
+
+/**
+ * Knobs the UI can turn on any persona before a call (all optional). Applied for that one
+ * session via `startSim({ tuning })`, or saved as a new persona (`source: "custom"`) with
+ * `POST /api/personas` after `applyPersonaTuning()`.
+ *
+ * Tone follows `traits.aggression`: 0–3 polite, 4–6 firm but civil, 7–8 blunt, 9–10 confrontational.
+ */
+export const personaTuningSchema = z.object({
+  archetype: z.enum(ARCHETYPES).optional(),
+  traits: z
+    .object({ patience: trait, aggression: trait, priceSensitivity: trait, talkativeness: trait })
+    .partial()
+    .optional(),
+  speechStyle: z
+    .object({ pace: z.enum(["slow", "normal", "fast"]), interrupts: z.boolean() })
+    .partial()
+    .optional(),
+  voiceId: z.string().regex(/^(elevenlabs|sarvam):.+/).optional(),
+});
+export type PersonaTuning = z.infer<typeof personaTuningSchema>;
+
+/** Pure: the persona as it will behave with `tuning` applied. Safe to call in the browser for previews. */
+export function applyPersonaTuning<P extends CreatePersona>(persona: P, tuning?: PersonaTuning | null): P {
+  if (!tuning) return persona;
+  return {
+    ...persona,
+    ...(tuning.archetype && { archetype: tuning.archetype }),
+    ...(tuning.voiceId && { voiceId: tuning.voiceId }),
+    traits: { ...persona.traits, ...tuning.traits },
+    speechStyle: { ...persona.speechStyle, ...tuning.speechStyle },
+  };
+}

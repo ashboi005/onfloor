@@ -29,7 +29,8 @@ export const ARCHETYPE_LABELS: Record<Archetype, string> = {
   custom: "Custom",
 };
 
-export const PERSONA_SOURCES = ["seed", "live_call"] as const;
+/** seed = shipped; live_call = extracted from a real call; custom = tuned and saved by a user. */
+export const PERSONA_SOURCES = ["seed", "live_call", "custom"] as const;
 export type PersonaSource = (typeof PERSONA_SOURCES)[number];
 
 export const SCORE_DIMENSIONS = [

@@ -17,10 +17,10 @@ import { cooldownFor, KeyPool, type PooledKey } from "./key-pool";
  * context, structured JSON), roleplay + copilot on Merge (high frequency).
  */
 
-export type LlmJob = "roleplay" | "copilot" | "scoring" | "persona";
+export type LlmJob = "roleplay" | "copilot" | "scoring" | "persona" | "translate";
 export type LlmProvider = "merge" | "gemini";
 /** "fast" is for latency-bound work (copilot hints, sentiment, captions). */
-export type ModelTier = "roleplay" | "fast" | "scoring";
+export type ModelTier = "roleplay" | "fast" | "scoring" | "translate";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -54,6 +54,7 @@ const DEFAULT_TIER: Record<LlmJob, ModelTier> = {
   copilot: "fast",
   scoring: "scoring",
   persona: "scoring",
+  translate: "translate",
 };
 
 interface ProviderConfig {
@@ -65,11 +66,22 @@ function providers(): Record<LlmProvider, ProviderConfig> {
   return {
     merge: {
       baseUrl: ENV.MERGE_BASE_URL,
-      models: { roleplay: ENV.MERGE_MODEL_ROLEPLAY, fast: ENV.MERGE_MODEL_FAST, scoring: ENV.MERGE_MODEL_SCORING },
+      models: {
+        roleplay: ENV.MERGE_MODEL_ROLEPLAY,
+        fast: ENV.MERGE_MODEL_FAST,
+        scoring: ENV.MERGE_MODEL_SCORING,
+        translate: ENV.MERGE_MODEL_TRANSLATE,
+      },
     },
     gemini: {
       baseUrl: ENV.GEMINI_BASE_URL,
-      models: { roleplay: ENV.GEMINI_MODEL_ROLEPLAY, fast: ENV.GEMINI_MODEL_FAST, scoring: ENV.GEMINI_MODEL_SCORING },
+      // Subtitles never use Gemini by default; this only applies if LLM_PROVIDER_TRANSLATE=gemini.
+      models: {
+        roleplay: ENV.GEMINI_MODEL_ROLEPLAY,
+        fast: ENV.GEMINI_MODEL_FAST,
+        scoring: ENV.GEMINI_MODEL_SCORING,
+        translate: ENV.GEMINI_MODEL_FAST,
+      },
     },
   };
 }
@@ -98,6 +110,8 @@ export function providerFor(job: LlmJob): LlmProvider {
     copilot: ENV.LLM_PROVIDER_COPILOT,
     scoring: ENV.LLM_PROVIDER_SCORING,
     persona: ENV.LLM_PROVIDER_PERSONA,
+    // Subtitles default to Merge regardless of LLM_PROVIDER (product decision 2026-10-10).
+    translate: ENV.LLM_PROVIDER_TRANSLATE || "merge",
   }[job];
   return override || ENV.LLM_PROVIDER;
 }
@@ -232,12 +246,13 @@ async function withFallback(job: LlmJob, run: (p: LlmProvider) => Promise<string
       return await run(primary);
     } catch (e) {
       // No other provider to fall back to: back off once on a rate limit / overload and retry the same one.
-      if (!retryable(e) || (ENV.LLM_FALLBACK && hasKeys(secondary))) throw e;
+      if (!retryable(e) || (ENV.LLM_FALLBACK && hasKeys(secondary) && job !== "translate")) throw e;
       await Bun.sleep(1500);
       return await run(primary);
     }
   } catch (e) {
-    if (ENV.LLM_FALLBACK && retryable(e) && hasKeys(secondary)) {
+    // Subtitles are Merge-only: never fall back to Gemini for them.
+    if (ENV.LLM_FALLBACK && retryable(e) && hasKeys(secondary) && job !== "translate") {
       console.warn(`[llm] ${job}: ${primary} failed (${(e as Error).message.slice(0, 80)}), falling back to ${secondary}`);
       return await run(secondary).catch((e2) => {
         throw new AppError("LLM_FAILED", { cause: e2 });

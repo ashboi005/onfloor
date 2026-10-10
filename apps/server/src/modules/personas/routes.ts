@@ -11,4 +11,8 @@ export const personaRoutes = new Elysia({ prefix: "/api/personas" })
     query: z.object({ source: z.enum(PERSONA_SOURCES).optional() }),
   })
   .get("/:id", ({ params }) => getPersona(params.id), { authed: true, params: z.object({ id: z.string() }) })
-  .post("/", ({ body }) => createPersona(body), { authed: true, body: createPersonaSchema });
+  /** "Save as custom persona" from the picker. Always stored as source "custom", never seed/live_call. */
+  .post("/", ({ body }) => createPersona({ ...body, source: "custom", sourceCallId: null }), {
+    authed: true,
+    body: createPersonaSchema,
+  });
