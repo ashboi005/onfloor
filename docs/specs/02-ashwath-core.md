@@ -3,8 +3,8 @@
 **You are the critical path for H0–2.** Everyone else is building on the mocks you push. Ship
 contracts and stubs before you write any real logic.
 
-> **Status (scaffold commit):** D1–D3 done; D4 (LLM toggle) real; STT token/URL real. Remaining:
-> TTS port, real `useSimCall` audio, D6 engine, D7 judge, D8 replay is wired (uses the stub engine).
+> **Status:** D1–D9 done and verified headlessly (real Gemini + ElevenLabs/Sarvam). Remaining: browser
+> pass on `useSimCall` audio, prompt tuning, Merge key + `llm:check`.
 
 ## Deliverables in unblock order
 

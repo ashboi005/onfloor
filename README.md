@@ -49,19 +49,26 @@ WebSockets and runs them through the real DB → scoring → persona path. `POST
 | `apps/web/src/app/(marketing)`, `(app)/{calls,personas}`, `/design`, `components/{shell,report}` | Landing, shell, scorecard, personas | Mansukh |
 | `docs/article` | The OnFloor article | Mansukh |
 
-## What's real vs stubbed (as of scaffold)
+## What's real vs stubbed
 
 | Piece | State |
 |---|---|
-| Auth, DB, all REST routes, both WebSockets, live hub, calls repo | ✅ real |
-| LLM provider toggle (Merge / Gemini, per-job, fallback) | ✅ real (needs keys) |
-| STT token + realtime URL (ElevenLabs) | ✅ real (needs key) |
-| Simulator engine | 🟡 replays fixture (`STUB_ENGINES`). Real engine: TODO(ashwath) |
-| Scoring | 🟡 returns fixture scorecard. Real judge: TODO(ashwath) |
-| TTS (ElevenLabs/Sarvam) | 🔴 TODO(ashwath) |
-| Browser mic / STT / audio playback in `useSimCall` | 🔴 TODO(ashwath) |
-| Live transcription, copilot LLM, replay-file, bridge audio | 🔴/🟡 TODO(tushar), see `apps/server/src/modules/live/README.md` |
-| All UI | 🟡 plain placeholders wired to the hooks: restyle/rebuild freely |
+| Auth, DB (migrated + seeded on the shared DB), all REST routes, both WebSockets, live hub | ✅ real |
+| LLM toggle: Gemini now (Merge key pending: `zai/glm-5.3-flash`), per-job, 429/5xx retry | ✅ real. `bun run llm:check` |
+| TTS: ElevenLabs + Sarvam by voiceId prefix | ✅ real |
+| Simulator engine: persona LLM, CRM requests, patience, dead air, barge-in, limits | ✅ real |
+| `useSimCall`: mic → ElevenLabs realtime STT, persona playback, barge-in, echo filter | ✅ real (verify in a browser) |
+| QA scoring: LLM judge + computed stats + CRM audit | ✅ real |
+| Persona extraction from live calls + replay in simulator | ✅ real (draft prompt in `modules/live`, Tushar's to tune) |
+| Live transcription, copilot LLM (hints/guardrails/sentiment/talk metrics), replay-file, bridge audio routing | 🔴/🟡 Tushar, see `apps/server/src/modules/live/README.md`. `/api/live/dev/simulate` plays the fixture through the real pipeline meanwhile |
+| All UI | 🟡 plain placeholders wired to the hooks: Harnoor/Mansukh restyle or rebuild |
+
+`STUB_ENGINES=true` swaps the simulator back to the fixture replay (no keys needed).
+`NEXT_PUBLIC_USE_MOCKS=true` runs the whole frontend on fixtures with no backend.
+
+Models (measured 2026-10-10): roleplay `gemini-3.5-flash-lite` (~1.8s), copilot `gemini-3.1-flash-lite`
+(~1.6s), scoring/persona `gemini-3.5-flash` with reasoning (~10s, post-call). Persona replies land
+~1.5-2.2s after the agent stops talking (plus ~0.6s STT VAD).
 
 ## Commands
 
