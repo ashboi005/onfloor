@@ -21,6 +21,7 @@ import { db } from "../../services";
 import { getPersona } from "../personas";
 import { getScenario } from "../scenarios";
 import { formatSnippets, goldenExamples, groundingFacts, rememberCall } from "../knowledge";
+import { LIVE_POLICIES } from "../live/policies";
 import { computeStats, crmAudit, toolAccuracyScore } from "./analytics";
 
 /**
@@ -154,7 +155,9 @@ export async function scoreCall(callId: string): Promise<Scorecard> {
     const scenario = call.scenarioId ? await getScenario(call.scenarioId) : null;
     // For sim calls the persona was played; for live it's extracted later, so it's optional.
     const persona = call.kind === "sim" && call.personaId ? await getPersona(call.personaId).catch(() => null) : null;
-    const policies = scenario?.policies ?? DEFAULT_POLICIES;
+    // Live calls are judged against the live module's canonical list (owner: Tushar), which
+    // extends the defaults (e.g. refunds); sim calls use their scenario's policies.
+    const policies = scenario?.policies ?? (call.kind === "live" ? LIVE_POLICIES : DEFAULT_POLICIES);
     const stats = computeStats(turns, call.durationMs);
 
     const audit =

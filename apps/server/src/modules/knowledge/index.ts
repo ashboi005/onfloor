@@ -21,13 +21,27 @@ import type { Snippet } from "../../core/services/knowledge";
 export const PLAYBOOK_SOURCE = "playbook";
 const PLAYBOOK_PATH = join(import.meta.dir, "../../../knowledge/onfloor-ads-playbook.md");
 
-const safe = async <T>(fallback: T, run: () => Promise<T>): Promise<T> => {
+/**
+ * Hard ceiling on any RAG lookup. Callers sit on latency-sensitive paths (live call start,
+ * copilot hints), and an unreachable Qdrant would otherwise hang on TCP timeouts.
+ */
+const RAG_TIMEOUT_MS = 2500;
+
+const safe = async <T>(fallback: T, run: () => Promise<T>, timeoutMs = RAG_TIMEOUT_MS): Promise<T> => {
   if (!services.knowledge.enabled) return fallback;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await run();
+    return await Promise.race([
+      run(),
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`timed out after ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
   } catch (err) {
     console.error("[knowledge]", (err as Error).message);
     return fallback;
+  } finally {
+    clearTimeout(timer);
   }
 };
 
@@ -101,6 +115,7 @@ const GOLDEN_MIN_OVERALL = 75;
  * throws. Idempotent per call (sources are keyed by call id, so re-scoring replaces).
  */
 export async function rememberCall(callId: string, card: Scorecard): Promise<void> {
+  // Background write-back: generous ceiling (several embeddings + upserts).
   await safe(undefined, async () => {
     const call = await calls.getWithTranscript(callId);
     const byId = new Map(call.transcript.map((t) => [t.id, t]));
@@ -172,5 +187,5 @@ export async function rememberCall(callId: string, card: Scorecard): Promise<voi
     }
 
     await Promise.all(jobs);
-  });
+  }, 60_000);
 }
