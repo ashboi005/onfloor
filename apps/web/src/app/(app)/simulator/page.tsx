@@ -1,86 +1,197 @@
 "use client";
 
-import { ARCHETYPE_LABELS, type Language, LANGUAGE_LABELS, LANGUAGES } from "@onfloor/contracts";
+/**
+ * Simulator picker: WHO you call (a Tomato merchant, or a customer from a live call to replay) →
+ * HOW they behave (a behaviour preset + sliders; live-call customers keep their own) → guidance
+ * on/off → start. Barebones reference wired end to end (Ashwath); Mansukh owns the look.
+ */
+import {
+  ARCHETYPE_LABELS,
+  type Language,
+  LANGUAGE_LABELS,
+  LANGUAGES,
+  type MerchantSummary,
+  type Persona,
+  type PersonaTuning,
+} from "@onfloor/contracts";
 import { Button } from "@onfloor/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@onfloor/ui/components/card";
 import { Skeleton } from "@onfloor/ui/components/skeleton";
-import { ArrowRight, Clock3, Languages, Play, ShieldCheck, Sparkles, Target, UsersRound } from "lucide-react";
+import { ArrowRight, Compass, Play, Radio, Sparkles, Store, UserRound } from "lucide-react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { usePersonas, useScenarios, useStartSim } from "@/lib/api";
+import { useMerchants, usePersonas, useScenarios, useStartSim } from "@/lib/api";
 import { saveSimSession } from "@/lib/sim-session";
+
+const TRAITS = ["patience", "aggression", "priceSensitivity", "talkativeness"] as const;
+type Traits = Persona["traits"];
+const rupees = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+const RELATION = { owner: "Owner answers", manager: "Manager answers", family: "Family member answers" } as const;
+
+type Pick = { kind: "merchant"; merchant: MerchantSummary } | { kind: "live"; persona: Persona };
 
 export default function SimulatorPicker() {
   const router = useRouter();
   const scenarios = useScenarios();
+  const merchants = useMerchants("seed");
   const personas = usePersonas();
   const startSim = useStartSim();
+
+  const [pick, setPick] = useState<Pick | null>(null);
   const [personaId, setPersonaId] = useState<string>();
+  const [traits, setTraits] = useState<Traits | null>(null);
+  const [guidance, setGuidance] = useState(true);
   const [language, setLanguage] = useState<Language>("hinglish");
 
   const scenario = scenarios.data?.[0];
-  const selectedPersonaId = personaId ?? scenario?.defaultPersonaId;
-  const selectedPersona = personas.data?.find((persona) => persona.id === selectedPersonaId);
+  const presets = personas.data?.filter((p) => p.source !== "live_call") ?? [];
+  const liveCustomers = personas.data?.filter((p) => p.source === "live_call") ?? [];
+  const merchantList = [...(merchants.data ?? [])].sort((a, b) => Number(b.demo) - Number(a.demo));
+  const preset = pick?.kind === "merchant" ? presets.find((p) => p.id === (personaId ?? pick.merchant.defaultPersonaId)) : undefined;
+
+  function choose(p: Pick) {
+    setPick(p);
+    setPersonaId(undefined);
+    setTraits(null);
+    setLanguage(p.kind === "merchant" ? p.merchant.language : p.persona.language);
+  }
 
   async function start() {
-    if (!scenario || !selectedPersonaId) return;
+    if (!pick) return;
+    const tuning: PersonaTuning | undefined = traits ? { traits } : undefined;
     try {
-      const session = await startSim.mutateAsync({ scenarioId: scenario.id, personaId: selectedPersonaId, language });
+      const session = await startSim.mutateAsync(
+        pick.kind === "merchant"
+          ? { scenarioId: scenario?.id, merchantId: pick.merchant.id, personaId: preset?.id, language, guidance, tuning }
+          : { scenarioId: scenario?.id, personaId: pick.persona.id, language, guidance, replayOfCallId: pick.persona.sourceCallId ?? undefined },
+      );
       saveSimSession(session);
       router.push(`/simulator/${session.callId}` as Route);
     } catch {
-      // TanStack mutation state renders the actionable error below.
+      // The mutation error is rendered below.
     }
   }
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 p-5 sm:p-8">
-      <header className="flex flex-col justify-between gap-5 border-b border-border/70 pb-7 lg:flex-row lg:items-end">
-        <div>
-          <div className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary"><Sparkles className="size-3.5" /> Practice room 01</div>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Flight Simulator</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Pick a customer, understand the objective, and practice the call with the merchant CRM open beside you.</p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground"><UsersRound className="size-4" /> {personas.data?.length ?? 0} customer profiles available</div>
+      <header className="border-b border-border/70 pb-6">
+        <div className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary"><Sparkles className="size-3.5" /> Practice room</div>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Flight Simulator</h1>
+        {scenario && <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">{scenario.brief}</p>}
       </header>
 
-      {scenarios.isPending && <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]"><Skeleton className="h-64" /><Skeleton className="h-64" /></div>}
-      {(scenarios.error || personas.error) && <div className="border border-red-400/30 bg-red-400/10 p-5 text-sm text-red-200">We couldn’t load the practice room. {scenarios.error?.message ?? personas.error?.message}</div>}
-      {!scenarios.isPending && !scenario && <div className="border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No simulator scenarios are available yet.</div>}
-
-      {scenario && (
-        <>
-          <Card className="overflow-hidden border-primary/20 bg-primary/[0.04]">
-            <div className="grid lg:grid-cols-[1fr_auto]">
-              <CardHeader className="p-6 sm:p-8">
-                <div className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary"><Target className="size-3.5" /> Scenario brief</div>
-                <CardTitle className="max-w-3xl text-2xl leading-tight sm:text-3xl">{scenario.title}</CardTitle>
-                <CardDescription className="mt-3 max-w-3xl text-sm leading-relaxed">{scenario.brief}</CardDescription>
-                <div className="mt-6 flex flex-wrap gap-2 text-xs"><span className="flex items-center gap-2 border border-border/70 bg-background/40 px-3 py-2"><ShieldCheck className="size-3.5 text-emerald-300" /> Objective: {scenario.objective}</span><span className="flex items-center gap-2 border border-border/70 bg-background/40 px-3 py-2"><Clock3 className="size-3.5 text-amber-300" /> Soft limit {Math.round(scenario.softLimitSec / 60)}m · hard limit {Math.round(scenario.hardLimitSec / 60)}m</span></div>
-              </CardHeader>
-              <div className="border-t border-border/70 bg-background/20 p-6 lg:border-l lg:border-t-0 lg:p-8"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Watch the policy line</p><div className="mt-4 space-y-3">{scenario.policies.slice(0, 3).map((policy) => <div key={policy.id} className="flex gap-2 text-xs"><span className={`mt-1 size-1.5 shrink-0 rounded-full ${policy.severity === "critical" ? "bg-rose-400" : "bg-amber-300"}`} /><span className="leading-relaxed text-foreground/80">{policy.rule}</span></div>)}</div></div>
-            </div>
-          </Card>
-
-          <div className="flex items-end justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Choose your customer</p><h2 className="mt-1 text-xl font-semibold">Who’s on the other end?</h2></div><span className="text-xs text-muted-foreground">Selected: {selectedPersona?.name ?? "Default customer"}</span></div>
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {personas.data?.map((persona) => {
-              const selected = selectedPersonaId === persona.id;
-              return <button type="button" key={persona.id} onClick={() => setPersonaId(persona.id)} aria-pressed={selected} className={`group text-left transition ${selected ? "-translate-y-1" : "hover:-translate-y-1"}`}>
-                <Card className={`h-full transition ${selected ? "border-primary bg-primary/[0.07] ring-1 ring-primary/50" : "hover:border-primary/40"}`}>
-                  <CardHeader className="p-4"><div className="flex items-start justify-between gap-3"><div className={`flex size-10 items-center justify-center rounded-full text-sm font-semibold ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{persona.name.split(" ").map((part) => part[0]).join("").slice(0, 2)}</div>{persona.source === "live_call" && <span className="border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-emerald-300">From live call</span>}</div><CardTitle className="mt-4 text-base">{persona.name}</CardTitle><CardDescription>{persona.role}</CardDescription></CardHeader>
-                  <CardContent className="space-y-4 p-4 pt-0"><div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-primary"><span>{ARCHETYPE_LABELS[persona.archetype]}</span><span>{persona.language}</span></div><div className="space-y-2">{(Object.entries(persona.traits) as [string, number][]).map(([key, value]) => <div key={key}><div className="mb-1 flex justify-between text-[10px] text-muted-foreground"><span>{key.replace(/([A-Z])/g, " $1")}</span><span>{value}/10</span></div><div className="h-1.5 bg-muted"><div className={`h-full ${selected ? "bg-primary" : "bg-muted-foreground/60"}`} style={{ width: `${value * 10}%` }} /></div></div>)}</div><p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">“{persona.openingLine}”</p></CardContent>
-                </Card>
-              </button>;
-            })}
-          </section>
-
-          <Card className="border-border/70 bg-card/70"><CardContent className="flex flex-col justify-between gap-5 p-5 sm:flex-row sm:items-center sm:p-6"><div><label htmlFor="sim-language" className="flex items-center gap-2 text-sm font-semibold"><Languages className="size-4 text-primary" /> Conversation language</label><p className="mt-1 text-xs text-muted-foreground">The customer’s language and voice will follow this selection.</p></div><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><select id="sim-language" className="h-9 border border-input bg-background px-3 text-xs outline-none focus-visible:border-ring" value={language} onChange={(event) => setLanguage(event.target.value as Language)}>{LANGUAGES.map((value) => <option key={value} value={value}>{LANGUAGE_LABELS[value]}</option>)}</select><Button type="button" size="lg" disabled={!selectedPersonaId || startSim.isPending} onClick={start}>{startSim.isPending ? "Opening call…" : <><Play className="size-4" /> Start call <ArrowRight className="size-4" /></>}</Button></div></CardContent></Card>
-          {startSim.error && <p role="alert" className="text-sm text-red-300">Couldn’t start the call: {startSim.error.message}</p>}
-        </>
+      {(scenarios.error || merchants.error || personas.error) && (
+        <div className="border border-red-400/30 bg-red-400/10 p-5 text-sm text-red-200">We couldn’t load the practice room. {scenarios.error?.message ?? merchants.error?.message ?? personas.error?.message}</div>
       )}
+
+      {/* 1. Who */}
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-lg font-semibold"><Store className="size-4 text-primary" /> 1. Who are you calling?</h2>
+        {merchants.isPending && <div className="grid gap-3 md:grid-cols-4"><Skeleton className="h-32" /><Skeleton className="h-32" /><Skeleton className="h-32" /><Skeleton className="h-32" /></div>}
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {merchantList.map((m) => {
+            const selected = pick?.kind === "merchant" && pick.merchant.id === m.id;
+            return (
+              <button key={m.id} type="button" onClick={() => choose({ kind: "merchant", merchant: m })} aria-pressed={selected} className="text-left">
+                <Card className={`h-full transition ${selected ? "border-primary ring-1 ring-primary/50" : "hover:border-primary/40"}`}>
+                  <CardHeader className="p-4">
+                    <div className="flex items-start justify-between gap-2"><CardTitle className="text-base">{m.restaurantName}</CardTitle>{m.demo && <span className="border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-primary">Demo</span>}</div>
+                    <CardDescription>{m.ownerName} · {m.locality}, {m.city}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-1 p-4 pt-0 text-xs text-muted-foreground">
+                    <p>{m.cuisines.join(", ")} · DRR {rupees(m.drr)}/day</p>
+                    <p>{RELATION[m.answeredBy]} · {LANGUAGE_LABELS[m.language]}</p>
+                    <p className="text-foreground/80">{m.tagline}</p>
+                  </CardContent>
+                </Card>
+              </button>
+            );
+          })}
+        </div>
+        {liveCustomers.length > 0 && (
+          <>
+            <p className="flex items-center gap-2 pt-2 text-xs font-semibold uppercase tracking-wider text-emerald-300"><Radio className="size-3.5" /> From live calls (replay the real customer)</p>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {liveCustomers.map((p) => {
+                const selected = pick?.kind === "live" && pick.persona.id === p.id;
+                return (
+                  <button key={p.id} type="button" onClick={() => choose({ kind: "live", persona: p })} aria-pressed={selected} className="text-left">
+                    <Card className={`h-full transition ${selected ? "border-emerald-400 ring-1 ring-emerald-400/50" : "hover:border-emerald-400/40"}`}>
+                      <CardHeader className="p-4"><CardTitle className="text-base">{p.name}</CardTitle><CardDescription>{p.role}</CardDescription></CardHeader>
+                      <CardContent className="p-4 pt-0 text-xs text-muted-foreground">{ARCHETYPE_LABELS[p.archetype]} · “{p.openingLine}”</CardContent>
+                    </Card>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* 2. How they behave */}
+      {pick && (
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 text-lg font-semibold"><UserRound className="size-4 text-primary" /> 2. How do they behave?</h2>
+          {pick.kind === "live" ? (
+            <p className="text-sm text-muted-foreground">Replaying {pick.persona.name} exactly as they behaved on the live call ({ARCHETYPE_LABELS[pick.persona.archetype]}).</p>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {presets.map((p) => {
+                  const selected = preset?.id === p.id;
+                  return (
+                    <button key={p.id} type="button" onClick={() => { setPersonaId(p.id); setTraits(null); }} aria-pressed={selected} className="text-left">
+                      <Card className={`h-full transition ${selected ? "border-primary ring-1 ring-primary/50" : "hover:border-primary/40"}`}>
+                        <CardHeader className="p-4"><CardTitle className="text-sm">{p.name}{p.id === pick.merchant.defaultPersonaId ? " · suggested" : ""}</CardTitle><CardDescription className="line-clamp-3 text-xs">{p.backstory}</CardDescription></CardHeader>
+                      </Card>
+                    </button>
+                  );
+                })}
+              </div>
+              {preset && (
+                <Card>
+                  <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">Fine-tune {preset.name}</CardTitle><CardDescription className="text-xs">Aggression drives the tone: 0–3 polite, 4–6 firm, 7–8 blunt, 9–10 confrontational.</CardDescription></CardHeader>
+                  <CardContent className="space-y-3 p-4 pt-2">
+                    {TRAITS.map((k) => {
+                      const value = (traits ?? preset.traits)[k];
+                      return (
+                        <label key={k} className="block text-xs">
+                          <span className="flex justify-between"><span>{k.replace(/([A-Z])/g, " $1")}</span><span className="font-mono">{value}/10</span></span>
+                          <input type="range" min={0} max={10} value={value} className="w-full" onChange={(e) => setTraits({ ...(traits ?? preset.traits), [k]: Number(e.target.value) })} />
+                        </label>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* 3. Guidance + start */}
+      {pick && (
+        <Card className="border-border/70 bg-card/70">
+          <CardContent className="flex flex-col justify-between gap-5 p-5 sm:flex-row sm:items-center sm:p-6">
+            <div className="space-y-3">
+              <label className="flex items-center gap-3 text-sm font-semibold">
+                <input type="checkbox" checked={guidance} onChange={(e) => setGuidance(e.target.checked)} className="size-4" />
+                <Compass className="size-4 text-amber-300" /> Guidance {guidance ? "on" : "off"}
+              </label>
+              <p className="max-w-xl text-xs text-muted-foreground">{guidance ? "Highlights the next step and the field to use, tips you on the customer's questions, and suggests the disposition after the call." : "No help: you run the call, the tools and the disposition on your own."}</p>
+              <label className="flex items-center gap-2 text-xs">Language
+                <select className="h-8 border border-input bg-background px-2" value={language} onChange={(e) => setLanguage(e.target.value as Language)}>{LANGUAGES.map((l) => <option key={l} value={l}>{LANGUAGE_LABELS[l]}</option>)}</select>
+              </label>
+            </div>
+            <Button type="button" size="lg" disabled={startSim.isPending || !scenario} onClick={start}>
+              {startSim.isPending ? "Starting…" : <><Play className="size-4" /> Start simulation <ArrowRight className="size-4" /></>}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      {startSim.error && <p role="alert" className="text-sm text-red-300">Couldn’t start the call: {startSim.error.message}</p>}
     </div>
   );
 }

@@ -4,12 +4,13 @@
  * Scorecard. OWNER: Mansukh. Spec: docs/specs/05-mansukh-design.md §5 (demo beats 3 & 4).
  * PLACEHOLDER: renders every field plainly. Build the real widgets in components/report/.
  */
-import { SCORE_DIMENSION_LABELS } from "@onfloor/contracts";
+import { DISPOSITION_LABELS, EMAIL_TEMPLATES, SCORE_DIMENSION_LABELS } from "@onfloor/contracts";
 import type { Route } from "next";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { useCall, useScorecard } from "@/lib/api";
+import { subtitleText, useSubtitleMode } from "@/lib/subtitles";
 
 const fmt = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
 
@@ -17,13 +18,14 @@ export default function ScorecardPage() {
   const { callId } = useParams<{ callId: string }>();
   const call = useCall(callId);
   const card = useScorecard(callId);
+  const [subtitleMode, setSubtitleMode] = useSubtitleMode();
 
   if (card.isPending || call.isPending) return <p className="p-8">Loading…</p>;
   if (call.error) return <p className="p-8 text-red-500">{call.error.message}</p>;
   if (card.data === null) {
     return (
       <div className="p-8">
-        {call.data?.status === "abandoned" ? "Too short to score." : "Scoring your call…"}
+        {call.data?.status === "abandoned" ? "Too short to score." : call.data?.status === "wrap_up" ? "Waiting for the disposition…" : "Scoring your call…"}
       </div>
     );
   }
@@ -53,6 +55,30 @@ export default function ScorecardPage() {
         ))}
       </section>
 
+      {sc.deductions.length > 0 && (
+        <section className="rounded-lg border border-red-400/30 bg-red-400/5 p-4 text-sm">
+          <h2 className="mb-2 font-semibold">QA deductions (−{sc.deductions.reduce((n, d) => n + d.points, 0)})</h2>
+          <ul className="space-y-1">
+            {sc.deductions.map((d) => (
+              <li key={d.code}>
+                <b>−{d.points}</b> {d.label}: {d.detail}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {sc.wrapUp && (
+        <section className="text-sm">
+          <b>Disposition:</b> {sc.wrapUp.outcome ? DISPOSITION_LABELS[sc.wrapUp.outcome] : "not disposed"}
+          {sc.wrapUp.emailTemplate && <> · email “{EMAIL_TEMPLATES[sc.wrapUp.emailTemplate].label}”</>}
+          {sc.wrapUp.callback && <> · callback {sc.wrapUp.callback.date} {sc.wrapUp.callback.time}</>}
+          {" · "}
+          {sc.wrapUp.secondsTaken === null ? "timer ran out" : `${sc.wrapUp.secondsTaken}s`} {sc.wrapUp.withinLimit ? "✓" : "✗ late"}
+          {sc.wrapUp.customerDecision && <> · customer decided: {DISPOSITION_LABELS[sc.wrapUp.customerDecision]}</>}
+        </section>
+      )}
+
       {sc.crmAudit.length > 0 && (
         <table className="w-full text-sm">
           <tbody>
@@ -69,13 +95,18 @@ export default function ScorecardPage() {
         </table>
       )}
 
+      <div className="flex gap-2 text-xs">
+        Transcript:
+        <button type="button" className={subtitleMode === "english" ? "font-semibold underline" : ""} onClick={() => setSubtitleMode("english")}>English</button>
+        <button type="button" className={subtitleMode === "raw" ? "font-semibold underline" : ""} onClick={() => setSubtitleMode("raw")}>Original</button>
+      </div>
       <section className="space-y-2 text-sm">
         {c.transcript.map((t) => {
           const m = momentFor(t.id);
           return (
             <div key={t.id} className={m ? `rounded-md p-2 ${m.severity === "mistake" ? "bg-red-500/10" : m.severity === "warning" ? "bg-amber-500/10" : "bg-emerald-500/10"}` : ""}>
               <span className="text-muted-foreground">{fmt(t.startMs)} {t.speaker}: </span>
-              {t.text}
+              {subtitleText(t, subtitleMode).text}
               {m && (
                 <div className="mt-1 text-xs">
                   <b>{m.title}</b>. {m.detail}

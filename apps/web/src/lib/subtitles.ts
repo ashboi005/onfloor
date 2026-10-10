@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 /**
  * Raw transcript vs English subtitles, shared by the simulator, live dashboard and scorecard.
- * The choice is remembered per browser (localStorage, best-effort).
+ * English is the default; the choice is remembered per browser (localStorage, best-effort).
  *
  *   const [mode, setMode] = useSubtitleMode();
  *   const { text, pending } = subtitleText(turn, mode);
@@ -14,7 +14,7 @@ export type SubtitleMode = "raw" | "english";
 const KEY = "onfloor:subtitle-mode";
 
 export function useSubtitleMode(): [SubtitleMode, (mode: SubtitleMode) => void] {
-  const [mode, setModeState] = useState<SubtitleMode>("raw");
+  const [mode, setModeState] = useState<SubtitleMode>("english");
   useEffect(() => {
     try {
       const saved = localStorage.getItem(KEY);
