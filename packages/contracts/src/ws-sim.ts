@@ -31,6 +31,8 @@ export type SimClientMessage = z.infer<typeof simClientMessageSchema>;
 export const simServerMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("state"), status: z.enum(CALL_STATUSES), elapsedMs: z.number().int() }),
   z.object({ type: z.literal("turn"), turn: transcriptTurnSchema }),
+  /** The English subtitle for an earlier turn (arrives after the turn, Hindi/Hinglish calls). */
+  z.object({ type: z.literal("turn_translation"), turnId: z.string(), translation: z.string() }),
   /** `audioUrl` is a server path (prefix with the API origin), fetched with credentials. "" = no audio. */
   z.object({ type: z.literal("persona_audio"), turnId: z.string(), audioUrl: z.string() }),
   z.object({ type: z.literal("persona_state"), state: z.enum(PERSONA_STATES) }),

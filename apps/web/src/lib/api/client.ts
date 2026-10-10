@@ -2,6 +2,7 @@ import type {
   Agent,
   ApiError,
   CreateKnowledgeDoc,
+  CreatePersona,
   KnowledgeScopeKind,
   KnowledgeSnippet,
   KnowledgeSource,
@@ -27,6 +28,8 @@ export interface ApiClient {
   scenarios(): Promise<Scenario[]>;
   personas(source?: PersonaSource): Promise<Persona[]>;
   persona(id: string): Promise<Persona>;
+  /** "Save as custom persona": stored with source "custom" whatever you send. */
+  createPersona(persona: CreatePersona): Promise<Persona>;
   calls(kind?: CallKind): Promise<Call[]>;
   call(id: string): Promise<CallWithTranscript>;
   /** null while the call is still being scored. */

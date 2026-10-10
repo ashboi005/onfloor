@@ -1,5 +1,7 @@
 "use client";
 
+/** Live call dashboard (HUD). OWNER: Tushar since 2026-10-10 (built by Harnoor). Spec: docs/specs/03-tushar-live.md §7. */
+
 import type { Route } from "next";
 import Link from "next/link";
 import { Button } from "@onfloor/ui/components/button";

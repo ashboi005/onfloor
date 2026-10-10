@@ -1,6 +1,6 @@
 "use client";
 
-import type { CallKind, CreateKnowledgeDoc, KnowledgeScopeKind, PersonaSource, StartSim } from "@onfloor/contracts";
+import type { CallKind, CreateKnowledgeDoc, CreatePersona, KnowledgeScopeKind, PersonaSource, StartSim } from "@onfloor/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./instance";
 
@@ -41,6 +41,14 @@ export const useScorecard = (callId: string | undefined) =>
 
 export const useActiveLiveCall = () =>
   useQuery({ queryKey: queryKeys.activeLive, queryFn: () => api.activeLiveCall(), refetchInterval: 3000 });
+
+export function useCreatePersona() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (persona: CreatePersona) => api.createPersona(persona),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["personas"] }),
+  });
+}
 
 export function useStartSim() {
   const qc = useQueryClient();

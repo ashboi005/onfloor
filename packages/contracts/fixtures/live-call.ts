@@ -46,6 +46,20 @@ const t = {
   a4: turn("agent", "Perfect, sending it on WhatsApp now. Thank you Suresh ji.", 68000, 72000),
 };
 
+/** English subtitles for the Hinglish lines (mock: they arrive ~1.5s after each final). */
+export const liveCallTranslations: Record<string, string> = {
+  [t.a0.id]: "Hello, this is Ashwath from OnFloor Ads. How can I help?",
+  [t.c1.id]: "Yes hello, this is Suresh from Patil Misal. I wanted to talk about the commission.",
+  [t.c2.id]: "The commission is far too high, brother. The others are quoting 8%.",
+  [t.a1.id]: "I understand. Can I ask what results you're seeing on weekends right now?",
+  [t.c3.id]: "Weekends are okay, but I want Premium if the rate is right. And get it live by tomorrow or I'm cancelling.",
+  [t.a2.id]: "Yes, of course, it'll be activated by tomorrow, I promise.",
+  [t.c4.id]: "Sure? And how much discount will you give?",
+  [t.a3.id]: t.a3.text,
+  [t.c5.id]: "10%... okay. Send the details, I'll have a look.",
+  [t.a4.id]: "Perfect, sending it on WhatsApp now. Thank you Suresh ji.",
+};
+
 const e = (atMs: number, event: LiveEvent): Timed<LiveEvent> => ({ atMs, event });
 const final = (tr: TranscriptTurn): Timed<LiveEvent> => e(tr.endMs, { type: "transcript_final", turn: tr });
 const partial = (tr: TranscriptTurn, words: number): Timed<LiveEvent> =>
@@ -54,7 +68,9 @@ const partial = (tr: TranscriptTurn, words: number): Timed<LiveEvent> =>
     speaker: tr.speaker,
     text: tr.text.split(" ").slice(0, words).join(" "),
   });
-const spoken = (tr: TranscriptTurn) => [partial(tr, 3), partial(tr, 7), final(tr)];
+const subtitle = (tr: TranscriptTurn): Timed<LiveEvent> =>
+  e(tr.endMs + 1500, { type: "transcript_translation", turnId: tr.id, translation: liveCallTranslations[tr.id] ?? tr.text });
+const spoken = (tr: TranscriptTurn) => [partial(tr, 3), partial(tr, 7), final(tr), subtitle(tr)];
 const talk = (atMs: number, agentTalkPct: number, currentSilenceMs = 0, alert: "dead_air" | "monologue" | null = null) =>
   e(atMs, { type: "talk_metrics", agentTalkPct, currentSilenceMs, alert });
 const mood = (atMs: number, patience: number, frustration: number, engagement: number) =>
@@ -123,6 +139,7 @@ export const liveCallTimeline: Timed<LiveEvent>[] = [
     },
   }),
   final(t.a2),
+  subtitle(t.a2),
   ...spoken(t.c4),
   talk(44000, 45),
   talk(48000, 45, 4000),

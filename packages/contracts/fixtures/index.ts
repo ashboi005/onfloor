@@ -13,11 +13,11 @@ import {
 } from "../src";
 import { agents, calls, currentAgent } from "./calls";
 import { knowledgeSnippets, knowledgeSources } from "./knowledge";
-import { LIVE_CALL_ID, LIVE_PERSONA_ID, liveCall, liveCallTimeline, liveCallTranscript } from "./live-call";
+import { LIVE_CALL_ID, LIVE_PERSONA_ID, liveCall, liveCallTimeline, liveCallTranscript, liveCallTranslations } from "./live-call";
 import { personas, VOICES } from "./personas";
 import { DEFAULT_POLICIES, premiumRestaurant, scenarios } from "./scenarios";
 import { liveScorecard, scorecards, simScorecard } from "./scorecards";
-import { SIM_CALL_ID, simCallTimeline, simCallTranscript } from "./sim-call";
+import { SIM_CALL_ID, simCallTimeline, simCallTranscript, simCallTranslations } from "./sim-call";
 
 /*
   Validated at import, so a fixture that drifts from its schema fails loudly the first
@@ -34,10 +34,12 @@ z.array(transcriptTurnSchema).parse([...simCallTranscript, ...liveCallTranscript
 for (const { event } of simCallTimeline) simServerMessageSchema.parse(event);
 for (const { event } of liveCallTimeline) liveEventSchema.parse(event);
 
-/** Transcript lookup for mock `GET /calls/:id`. */
+/** Transcript lookup for mock `GET /calls/:id` (with English subtitles filled in, as after the call). */
+const withTranslations = (turns: typeof simCallTranscript, tr: Record<string, string>) =>
+  turns.map((turn) => ({ ...turn, translation: tr[turn.id] ?? turn.text }));
 export const transcripts: Record<string, typeof simCallTranscript> = {
-  [SIM_CALL_ID]: simCallTranscript,
-  [LIVE_CALL_ID]: liveCallTranscript,
+  [SIM_CALL_ID]: withTranslations(simCallTranscript, simCallTranslations),
+  [LIVE_CALL_ID]: withTranslations(liveCallTranscript, liveCallTranslations),
 };
 
 export * from "./personas";
@@ -53,6 +55,7 @@ export {
   liveCall,
   liveCallTimeline,
   liveCallTranscript,
+  liveCallTranslations,
   liveScorecard,
   personas,
   premiumRestaurant,
@@ -61,6 +64,7 @@ export {
   SIM_CALL_ID,
   simCallTimeline,
   simCallTranscript,
+  simCallTranslations,
   simScorecard,
   VOICES,
 };

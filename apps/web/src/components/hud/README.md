@@ -1,3 +1,3 @@
-# components/hud (owner: Harnoor)
+# components/hud (owner: Tushar)
 
-Live HUD widgets. Data only via `useLiveCall` (`@/hooks/use-live-call`).
+Live call dashboard widgets. Data only via `useLiveCall` (`@/hooks/use-live-call`). Spec: `docs/specs/03-tushar-live.md` §7.

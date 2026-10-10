@@ -1,0 +1,1 @@
+ALTER TABLE "transcript_turns" ADD COLUMN "translation" text;

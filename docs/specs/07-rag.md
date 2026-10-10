@@ -1,8 +1,8 @@
 # OnFloor: Knowledge & RAG
 
 Owner: **Ashwath** (store, ingestion, simulator + scoring integration).
-Touches: **Tushar** (copilot grounding, already-wired customer memory) and **Harnoor** (one HUD card,
-hint source chips). Mansukh: nothing required (an optional manager "Knowledge" page is possible, the
+Touches: **Tushar** (copilot grounding, already-wired customer memory, and the HUD's "Last time…" card
+and hint source chips, since he owns the live dashboard). Mansukh: nothing required (an optional manager "Knowledge" page is possible, the
 API and hooks exist).
 
 ## 1. What it does
@@ -105,7 +105,25 @@ All of them are safe to call unconditionally: they return empty results when RAG
 - Fixtures: `liveCallTimeline` now includes a `customer_memory` event and cited hints;
   `fixtures/knowledge.ts` has sample sources and snippets for the mock API.
 
-## 7. Limits & next steps
+## 7. Demo content must change together ⚠️
+
+The scenario, personas, CRM fields and the RAG seed describe **one** fictional business (OnFloor Ads
+selling local advertising to restaurants). When the demo scenario or personas change, **reseed the
+knowledge base to match**, or the judge and copilot will ground themselves in the wrong prices,
+plans and policies:
+
+| Change | Also update |
+|---|---|
+| Scenario (`packages/contracts/fixtures/scenarios.ts`): product, objective, policies | `apps/server/knowledge/*.md` (prices, plans, policies, competitor facts), then `bun run db:seed` or `POST /api/knowledge/docs/playbook/reindex` |
+| Personas (`fixtures/personas.ts`): business type, current plan, objections | Playbook objection counters + competitor facts |
+| Mock CRM fields (`packages/contracts/src/crm.ts`) | Playbook "account changes" + `crmRequests` in personas |
+| Live policies (`apps/server/src/modules/live/policies.ts`) | Playbook "Discounts and approvals" / "Compliance" sections |
+
+Old org docs aren't removed by a reseed of a *different* source name: delete them with
+`DELETE /api/knowledge/docs/:source`. Agent, golden and customer memories from old calls can be wiped by
+dropping the Qdrant collection (and clearing `knowledge_sources`) before the final demo.
+
+## 8. Limits & next steps
 
 - Copilot grounding adds one embedding call (~0.3–1s) per customer turn. Keep the keyword fast path for
   instant hints, and use RAG on the LLM hint path (see `03-tushar-live.md` §3a).

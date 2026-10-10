@@ -18,8 +18,8 @@ or live) gets scored right away, and a live call is turned into a **persona** th
 | Person | Owns | Spec |
 |---|---|---|
 | **Ashwath** | Repo, contracts, DB, core backend (LLM/voice services, simulator engine, scoring engine, personas), web data layer and hooks | `02-ashwath-core.md` |
-| **Tushar** | Live call pillar: Telegram bridge, live transcription, copilot brain (hints/guardrails/sentiment), live call storage, persona extraction | `03-tushar-live.md` + `03a-telegram-voice-guide.md` |
-| **Harnoor** | App frontend: Simulator workspace (Mock CRM + Call Terminal), Live HUD, scenario/persona picker | `04-harnoor-frontend.md` |
+| **Tushar** | Live call pillar end to end: Telegram bridge, live transcription, copilot brain (hints/guardrails/sentiment), live call storage, persona extraction, **and the live dashboard UI** (`/live`) | `03-tushar-live.md` + `03a-telegram-voice-guide.md` |
+| **Harnoor** | App frontend: Simulator workspace (Mock CRM + Call Terminal), scenario/persona picker | `04-harnoor-frontend.md` |
 | **Mansukh** | Brand + design system, landing page, app shell, Scorecard/Reports UI, persona library UI, the OnFloor article, demo assets | `05-mansukh-design.md` |
 
 **Rule of thumb:** you own a folder. You don't edit someone else's folder; you open a PR or
@@ -52,13 +52,13 @@ onfloor/                    (scaffolded with better-t-stack; see README "Layout 
         (marketing)/        landing page                          [Mansukh]
         (app)/layout.tsx    auth gate + app shell                 [Mansukh: components/shell]
         (app)/simulator/    picker, /new?replay=, /[callId] workspace  [Harnoor]
-        (app)/live/         live HUD                              [Harnoor]
+        (app)/live/         live call dashboard (HUD)             [Tushar]
         (app)/calls/        call list + scorecard pages           [Mansukh]
         (app)/personas/     persona library + "replay" button     [Mansukh]
         design/             design-system QA sheet                [Mansukh]
         login/              Better Auth sign-in                   [Mansukh styles]
       components/sim/       CRM + call terminal                   [Harnoor]
-      components/hud/       HUD widgets                           [Harnoor]
+      components/hud/       HUD widgets                           [Tushar]
       components/report/    scorecard widgets                     [Mansukh]
       components/shell/     app shell / nav                       [Mansukh]
       lib/api/              typed client, mock + http impl        [Ashwath]
@@ -117,6 +117,9 @@ onfloor/                    (scaffolded with better-t-stack; see README "Layout 
 4. Live: client calls over Telegram → HUD streams hints, guardrail warnings, sentiment.
 5. Hang up → live scorecard → "Persona created" → **Replay in simulator** → the same
    customer's behaviour, now voiced by the AI.
+
+**Demo content is coupled:** changing the scenario, personas or CRM means reseeding the RAG
+knowledge base to match (`07-rag.md` §7).
 
 **Fallback (mandatory):** if Telegram is flaky on stage, the live pipeline must also
 accept a **pre-recorded call file** (`POST /api/live/calls/replay-file`) that streams

@@ -24,6 +24,8 @@ import { playTimeline } from "./timeline";
  *
  *   const call = useSimCall(start);   // start = result of useStartSim().mutateAsync(...)
  *   call.turns, call.personaState, call.patience, call.pendingCrmRequests, call.micLevel, ...
+ *   turn.translation: English subtitle, arrives a bit after the turn for Hindi/Hinglish
+ *   (render with `subtitleText(turn, mode)` from "@/lib/subtitles")
  *   call.reportCrmAction({ field, from, to });
  *   const { callId } = await call.end();
  *
@@ -112,12 +114,18 @@ function reducer(s: SimCallState, a: Action): SimCallState {
       switch (m.type) {
         case "state":
           return { ...s, status: m.status === "active" ? "live" : s.status, elapsedMs: m.elapsedMs };
-        case "turn":
+        case "turn": {
+          // Keep a subtitle that raced ahead of a re-sent turn (reconnect catch-up).
+          const prev = s.turns.find((t) => t.id === m.turn.id);
+          const turn = prev?.translation && !m.turn.translation ? { ...m.turn, translation: prev.translation } : m.turn;
           return {
             ...s,
             status: s.status === "connecting" ? "live" : s.status,
-            turns: [...s.turns.filter((t) => t.id !== m.turn.id), m.turn].sort((x, y) => x.seq - y.seq),
+            turns: [...s.turns.filter((t) => t.id !== m.turn.id), turn].sort((x, y) => x.seq - y.seq),
           };
+        }
+        case "turn_translation":
+          return { ...s, turns: s.turns.map((t) => (t.id === m.turnId ? { ...t, translation: m.translation } : t)) };
         case "persona_state":
           return { ...s, personaState: m.state };
         case "patience":

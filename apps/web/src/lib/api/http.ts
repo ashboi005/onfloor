@@ -44,6 +44,7 @@ export const httpClient: ApiClient = {
   scenarios: () => request(z.array(scenarioSchema), "/api/scenarios"),
   personas: (source) => request(z.array(personaSchema), `/api/personas${qs({ source })}`),
   persona: (id) => request(personaSchema, `/api/personas/${id}`),
+  createPersona: (persona) => request(personaSchema, "/api/personas", post(persona)),
   calls: (kind) => request(z.array(callSchema), `/api/calls${qs({ kind })}`),
   call: (id) => request(callWithTranscriptSchema, `/api/calls/${id}`),
   // 202 { status } while scoring → null (the hook keeps polling).

@@ -62,6 +62,27 @@ export interface KnowledgeService {
   sources(scope?: KnowledgeScope["kind"]): Promise<KnowledgeSource[]>;
 }
 
+/**
+ * Query-embedding cache. The live copilot asks two scopes (playbook + customer memory) about
+ * the same customer line, and retries ask again: one embedding per distinct query text.
+ */
+const QUERY_CACHE_MAX = 256;
+const queryCache = new Map<string, Promise<number[]>>();
+function embedQuery(text: string): Promise<number[]> {
+  const key = text.slice(0, 4000);
+  const hit = queryCache.get(key);
+  if (hit) {
+    queryCache.delete(key); // refresh LRU position
+    queryCache.set(key, hit);
+    return hit;
+  }
+  const pending = embed([key]).then(([v]) => v!);
+  pending.catch(() => queryCache.delete(key)); // never cache a failure
+  queryCache.set(key, pending);
+  if (queryCache.size > QUERY_CACHE_MAX) queryCache.delete(queryCache.keys().next().value!);
+  return pending;
+}
+
 const scopeKeyOf = (s: KnowledgeScope) => (s.kind === "customer" ? s.customerKey : s.kind === "agent" ? s.agentId : "");
 
 /** Below this cosine similarity a hit is noise (gemini-embedding-001 @768). */
@@ -115,8 +136,8 @@ class QdrantKnowledge implements KnowledgeService {
   async retrieve(query: string, scope: KnowledgeScope, k = 4, opts: { minScore?: number } = {}): Promise<Snippet[]> {
     if (!query.trim()) return [];
     await this.ensure();
-    const [vector] = await embed([query.slice(0, 4000)]);
-    const hits = await this.store.query({ indexName: this.index, queryVector: vector!, topK: k, filter: this.filter(scope) });
+    const vector = await embedQuery(query);
+    const hits = await this.store.query({ indexName: this.index, queryVector: vector, topK: k, filter: this.filter(scope) });
     const min = opts.minScore ?? DEFAULT_MIN_SCORE;
     return hits
       .filter((h) => h.score >= min)

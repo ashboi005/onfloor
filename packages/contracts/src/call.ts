@@ -11,6 +11,12 @@ export const transcriptTurnSchema = z.object({
   language: z.enum(LANGUAGES).optional(),
   startMs: z.number().int().min(0),
   endMs: z.number().int().min(0),
+  /**
+   * English subtitle. Same as `text` for English calls; for Hindi/Hinglish it's filled in a
+   * second or two later (Merge, never Gemini) and announced by a `turn_translation` (sim) /
+   * `transcript_translation` (live) event. Absent until then.
+   */
+  translation: z.string().optional(),
 });
 export type TranscriptTurn = z.infer<typeof transcriptTurnSchema>;
 

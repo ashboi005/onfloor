@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { LANGUAGES } from "./domain";
-import { personaSchema } from "./persona";
+import { personaSchema, personaTuningSchema } from "./persona";
 import { scenarioSchema } from "./scenario";
 
 /** Every non-2xx body from the API. */
@@ -29,6 +29,8 @@ export const startSimSchema = z.object({
   personaId: z.string().optional(),
   language: z.enum(LANGUAGES),
   replayOfCallId: z.string().optional(),
+  /** Per-call persona tweaks (traits, archetype, pace, voice). Not saved to the persona. */
+  tuning: personaTuningSchema.optional(),
 });
 export type StartSim = z.infer<typeof startSimSchema>;
 
