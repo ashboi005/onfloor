@@ -11,7 +11,12 @@ import { db } from "../../services";
  */
 
 type Row = typeof personas.$inferSelect;
-const toPersona = (r: Row): Persona => ({ ...r.body, id: r.id, createdAt: r.createdAt.toISOString() });
+const toPersona = (r: Row): Persona => {
+  // Older databases used values such as "fixture" for seeded personas. Keep the
+  // API compatible with those rows while the next seed run repairs the columns.
+  const source = r.source === "live_call" || r.body.source === "live_call" ? "live_call" : "seed";
+  return { ...r.body, id: r.id, source, createdAt: r.createdAt.toISOString() };
+};
 
 /**
  * Coerce request values onto the CRM's actual field types (LLM extraction says
@@ -61,7 +66,14 @@ export async function createPersona(input: CreatePersona, id?: string): Promise<
     })
     .onConflictDoUpdate({
       target: personas.id,
-      set: { name: body.name, archetype: body.archetype, language: body.language, body },
+      set: {
+        name: body.name,
+        archetype: body.archetype,
+        language: body.language,
+        source: body.source,
+        sourceCallId: body.sourceCallId,
+        body,
+      },
     })
     .returning();
   return toPersona(row!);
