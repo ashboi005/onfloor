@@ -4,7 +4,7 @@ import { z } from "zod";
 import { authGuard, requireAgentWs } from "../../core/auth-guard";
 import { calls } from "../../core/calls";
 import { AppError } from "../../core/errors";
-import { attachSocket, finishSim, handleClientMessage, startSim } from "./engine";
+import { attachSocket, finishSim, getAudio, handleClientMessage, refreshSttUrl, startSim } from "./engine";
 
 const detach = new WeakMap<object, () => void>();
 
@@ -18,6 +18,24 @@ export const simRoutes = new Elysia()
       return finishSim(params.callId);
     },
     { authed: true, params: z.object({ callId: z.string() }) },
+  )
+  /** A fresh single-use STT URL (tokens are consumed on connect, so every reconnect needs one). */
+  .post("/api/sim/sessions/:callId/stt", ({ agent, params }) => refreshSttUrl(agent, params.callId), {
+    authed: true,
+    params: z.object({ callId: z.string() }),
+  })
+  /** Persona audio. Served from here so provider keys never reach the browser. */
+  .get(
+    "/api/sim/sessions/:callId/audio/:turnId",
+    async ({ agent, params, status }) => {
+      await calls.getOwned(params.callId, agent);
+      const audio = getAudio(params.callId, params.turnId);
+      if (!audio) return status(404, { error: { code: "NOT_FOUND", message: "That audio has expired.", retryable: false } });
+      return new Response(audio.audio, {
+        headers: { "content-type": audio.contentType, "cache-control": "private, max-age=600" },
+      });
+    },
+    { authed: true, params: z.object({ callId: z.string(), turnId: z.string() }) },
   )
   .ws("/ws/sim/:callId", {
     async open(ws) {
