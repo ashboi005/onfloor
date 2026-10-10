@@ -6,5 +6,6 @@ export * from "./knowledge";
 export * from "./persona";
 export * from "./scenario";
 export * from "./scorecard";
+export * from "./tomato";
 export * from "./ws-live";
 export * from "./ws-sim";

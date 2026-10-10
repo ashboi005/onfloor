@@ -5,6 +5,7 @@ import {
   knowledgeSnippetSchema,
   knowledgeSourceSchema,
   liveEventSchema,
+  merchantSchema,
   personaSchema,
   scenarioSchema,
   scorecardSchema,
@@ -14,10 +15,19 @@ import {
 import { agents, calls, currentAgent } from "./calls";
 import { knowledgeSnippets, knowledgeSources } from "./knowledge";
 import { LIVE_CALL_ID, LIVE_PERSONA_ID, liveCall, liveCallTimeline, liveCallTranscript, liveCallTranslations } from "./live-call";
-import { personas, VOICES } from "./personas";
-import { DEFAULT_POLICIES, premiumRestaurant, scenarios } from "./scenarios";
+import { merchants } from "./merchants";
+import { PERSONA_PRESETS, personas, VOICES } from "./personas";
+import { DEFAULT_POLICIES, MAX_GROW_POLICIES, maxGrowOutbound, scenarios } from "./scenarios";
 import { liveScorecard, scorecards, simScorecard } from "./scorecards";
-import { SIM_CALL_ID, simCallTimeline, simCallTranscript, simCallTranslations } from "./sim-call";
+import {
+  SIM_CALL_DATE,
+  SIM_CALL_ID,
+  simCallTimeline,
+  simCallTranscript,
+  simCallTranslations,
+  simRingTimeline,
+  simWrapUpTimeline,
+} from "./sim-call";
 
 /*
   Validated at import, so a fixture that drifts from its schema fails loudly the first
@@ -27,11 +37,16 @@ z.array(agentSchema).parse(agents);
 z.array(knowledgeSourceSchema).parse(knowledgeSources);
 z.array(knowledgeSnippetSchema).parse(knowledgeSnippets);
 z.array(personaSchema).parse(personas);
+z.array(merchantSchema).parse(merchants);
+for (const m of merchants) {
+  if (!personas.some((p) => p.id === m.defaultPersonaId)) throw new Error(`fixtures: ${m.id} has unknown defaultPersonaId`);
+}
+if (new Set(merchants.map((m) => m.uid)).size !== merchants.length) throw new Error("fixtures: duplicate merchant UID");
 z.array(scenarioSchema).parse(scenarios);
 z.array(callSchema).parse(calls);
 z.array(scorecardSchema).parse(scorecards);
 z.array(transcriptTurnSchema).parse([...simCallTranscript, ...liveCallTranscript]);
-for (const { event } of simCallTimeline) simServerMessageSchema.parse(event);
+for (const { event } of [...simRingTimeline, ...simCallTimeline, ...simWrapUpTimeline]) simServerMessageSchema.parse(event);
 for (const { event } of liveCallTimeline) liveEventSchema.parse(event);
 
 /** Transcript lookup for mock `GET /calls/:id` (with English subtitles filled in, as after the call). */
@@ -42,6 +57,7 @@ export const transcripts: Record<string, typeof simCallTranscript> = {
   [LIVE_CALL_ID]: withTranslations(liveCallTranscript, liveCallTranslations),
 };
 
+export * from "./merchants";
 export * from "./personas";
 export {
   agents,
@@ -57,14 +73,19 @@ export {
   liveCallTranscript,
   liveCallTranslations,
   liveScorecard,
+  MAX_GROW_POLICIES,
+  maxGrowOutbound,
+  PERSONA_PRESETS,
   personas,
-  premiumRestaurant,
   scenarios,
   scorecards,
+  SIM_CALL_DATE,
   SIM_CALL_ID,
   simCallTimeline,
   simCallTranscript,
   simCallTranslations,
+  simRingTimeline,
   simScorecard,
+  simWrapUpTimeline,
   VOICES,
 };

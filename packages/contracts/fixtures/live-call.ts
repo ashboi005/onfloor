@@ -17,6 +17,8 @@ export const liveCall: Call = {
   agentId: "agent_ashwath",
   scenarioId: null,
   personaId: null,
+  merchantId: null,
+  guidance: false,
   replayOfCallId: null,
   language: "hinglish",
   customerLabel: "Suresh Patil",

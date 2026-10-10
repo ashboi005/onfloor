@@ -29,6 +29,10 @@ export const callSchema = z.object({
   scenarioId: z.string().nullable(),
   /** sim: the persona played. live: the persona extracted afterwards. */
   personaId: z.string().nullable(),
+  /** sim: the merchant profile on the other end. null for live calls. */
+  merchantId: z.string().nullable(),
+  /** sim: the "guidance on" toggle. */
+  guidance: z.boolean(),
   /** Set on a sim call that replays a live call. */
   replayOfCallId: z.string().nullable(),
   language: z.enum(LANGUAGES),

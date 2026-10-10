@@ -11,112 +11,119 @@ export const VOICES = {
 
 const CREATED = "2026-10-10T08:00:00.000Z";
 
-export const rakesh: Persona = {
-  id: "persona_rakesh",
-  name: "Rakesh Mehta",
-  role: "Owner, Mehta's Kitchen (3 outlets)",
-  business: { type: "restaurant", city: "Pune", currentPlan: "Basic Ads, ₹30,000/mo" },
-  archetype: "price_squeezer",
+/**
+ * Behaviour presets: HOW the customer acts. The picker pairs one with a merchant profile
+ * (fixtures/merchants.ts), which supplies WHO they are, their restaurant's data, their own
+ * questions and asks. Name/role/business here are only the preset's label; on a call the
+ * merchant's identity and voice are used.
+ */
+const preset = (p: Omit<Persona, "role" | "business" | "language" | "voiceId" | "source" | "sourceCallId" | "createdAt" | "crmRequests">): Persona => ({
+  ...p,
+  role: "Behaviour preset",
+  business: { type: "restaurant" },
   language: "hinglish",
   voiceId: VOICES.mahesh,
+  crmRequests: [],
+  source: "seed",
+  sourceCallId: null,
+  createdAt: CREATED,
+});
+
+/** The one we demo: listens, asks good questions, says yes when the plan is explained correctly. */
+export const curious = preset({
+  id: "persona_curious",
+  name: "Curious & Open",
+  archetype: "curious",
+  traits: { patience: 7, aggression: 2, priceSensitivity: 5, talkativeness: 6 },
+  backstory:
+    "Friendly and genuinely interested in growing. Asks practical questions before agreeing and wants to understand exactly what gets deducted and when. Says yes once the plan has been explained clearly and correctly.",
+  goals: ["Rank higher when people search for the dishes they sell", "Understand exactly what they will pay", "No surprises in the payout"],
+  objections: ["If my sales don't go up, do I still pay?", "How much will be cut, and when?", "Can I stop it in between if I don't like it?"],
+  tactics: ["Repeats the commission back to check they understood it", "Asks for an example with real numbers"],
+  speechStyle: { pace: "normal", interrupts: false, catchphrases: ["Achha, samjhaiye zara.", "Theek hai, aur?"] },
+  openingLine: "Hello? Haan ji, boliye.",
+});
+
+export const skeptic = preset({
+  id: "persona_skeptic",
+  name: "Commission Skeptic",
+  archetype: "skeptic",
+  traits: { patience: 5, aggression: 5, priceSensitivity: 8, talkativeness: 6 },
+  backstory:
+    "Suspicious of any new deduction from the payout. Believes platforms find ways to charge for sales that would have come anyway. Needs the 'incremental' part explained with numbers before agreeing.",
+  goals: ["Not pay for sales they would have got anyway", "Proof that the baseline is fair"],
+  objections: [
+    "Why should I pay 20% on my own sales?",
+    "How do you calculate incremental? What if it's just a festival week?",
+    "What's the catch?",
+  ],
+  tactics: ["Asks the same question twice in different words", "Misquotes the commission to see if the rep corrects them"],
+  speechStyle: { pace: "normal", interrupts: false, catchphrases: ["Catch kya hai?", "Seedha number batao."] },
+  openingLine: "Haan, hello. Kaun bol raha hai?",
+});
+
+export const bargainer = preset({
+  id: "persona_bargainer",
+  name: "Hard Bargainer",
+  archetype: "price_squeezer",
   traits: { patience: 5, aggression: 6, priceSensitivity: 9, talkativeness: 6 },
   backstory:
-    "Runs three family restaurants in Pune. Has been on the Basic plan for a year, sees decent weekday orders but weekends are flat. Thinks every platform overcharges and loves to negotiate.",
-  goals: ["More weekend footfall", "Pay less than he does today", "Feel like he won the negotiation"],
-  objections: [
-    "Your commission is too high, yaar.",
-    "Zestify is offering me the same thing at 8%.",
-    "Premium sounds nice but what's the guarantee?",
-  ],
-  tactics: [
-    "Claims a competitor charges 8% (it actually charges 14%)",
-    "Asks for a 20% discount early to anchor low",
-    "Goes quiet after a price is quoted to make the agent fill the silence",
-  ],
-  speechStyle: {
-    pace: "fast",
-    interrupts: true,
-    catchphrases: ["Dekho bhai, straight baat karo.", "Kitna final karoge?"],
-  },
-  crmRequests: [
-    {
-      id: "req_budget",
-      field: "monthlyBudget",
-      value: 50000,
-      phrasing: "Theek hai, budget 50,000 kar do monthly.",
-    },
-    {
-      id: "req_weekend",
-      field: "weekendNotifications",
-      value: false,
-      phrasing: "Aur ye weekend wale notifications band karo, staff pareshan hota hai.",
-    },
-  ],
-  openingLine: "Haan, bolo. Five minutes hai mere paas, jaldi batao kya offer hai.",
-  source: "seed",
-  sourceCallId: null,
-  createdAt: CREATED,
-};
+    "Negotiates everything. Will try to get the commission lowered to 10 or 15% and claims other partners got a better rate. Accepts if the rep holds the 20% firmly and shows why it only applies to extra sales.",
+  goals: ["Get a lower commission", "Feel like they won something"],
+  objections: ["Twenty percent is too much, make it ten.", "My friend's restaurant got it for fifteen.", "What discount can you give me if I sign today?"],
+  tactics: ["Anchors at 10% commission", "Goes quiet after the rep says no to make them fill the silence"],
+  speechStyle: { pace: "fast", interrupts: true, catchphrases: ["Kitna final karoge?", "Dekho bhai, straight baat karo."] },
+  openingLine: "Haan bolo, kya hai?",
+});
 
-export const arjun: Persona = {
-  id: "persona_arjun",
-  name: "Arjun Malhotra",
-  role: "Founder, BowlBox (cloud kitchen, 6 locations)",
-  business: { type: "cloud_kitchen", city: "Bengaluru", currentPlan: "Premium, ₹80,000/mo" },
+export const busy = preset({
+  id: "persona_busy",
+  name: "Busy & Impatient",
   archetype: "impatient",
-  language: "en",
-  voiceId: VOICES.bunty,
-  traits: { patience: 2, aggression: 5, priceSensitivity: 5, talkativeness: 3 },
+  traits: { patience: 3, aggression: 5, priceSensitivity: 5, talkativeness: 3 },
   backstory:
-    "Young founder scaling fast. Back-to-back meetings all day. Wants numbers, not pitches, and hangs up on anyone who rambles.",
-  goals: ["Know in one sentence why he should upgrade", "Fix his campaign targeting today"],
-  objections: ["Skip the pitch, what's the number?", "I don't have time for a demo."],
-  tactics: ["Cuts off answers longer than 20 seconds", "Threatens to hang up after 6s of dead air"],
-  speechStyle: { pace: "fast", interrupts: true, catchphrases: ["Bottom line?", "Next."] },
-  crmRequests: [
-    { id: "req_radius", field: "targetRadiusKm", value: 8, phrasing: "Bump my radius to 8 km." },
-    { id: "req_pause", field: "campaignStatus", value: "paused", phrasing: "And pause the campaign till Monday." },
-  ],
-  openingLine: "Hi, I've got two minutes. What do you need?",
-  source: "seed",
-  sourceCallId: null,
-  createdAt: CREATED,
-};
+    "Picked up during a rush. Wants the point in one sentence and gets irritated by long pitches or silences. Decides fast, either way.",
+  goals: ["Get off the phone quickly", "Only hear what matters"],
+  objections: ["I'm busy, what is this about?", "Just tell me the bottom line."],
+  tactics: ["Cuts off answers longer than 20 seconds", "Says they have to go if the rep goes quiet"],
+  speechStyle: { pace: "fast", interrupts: true, catchphrases: ["Jaldi bolo.", "Point pe aao."] },
+  openingLine: "Haan bolo, jaldi, rush chal raha hai.",
+});
 
-export const vikram: Persona = {
-  id: "persona_vikram",
-  name: "Vikram Sethi",
-  role: "Owner, Brew & Bake Café",
-  business: { type: "cafe", city: "Delhi", currentPlan: "Basic Ads, ₹15,000/mo" },
-  archetype: "skeptic",
-  language: "en",
-  voiceId: VOICES.srikant,
-  traits: { patience: 7, aggression: 3, priceSensitivity: 6, talkativeness: 8 },
+export const frustrated = preset({
+  id: "persona_frustrated",
+  name: "Frustrated Complainer",
+  archetype: "complainer",
+  traits: { patience: 4, aggression: 6, priceSensitivity: 7, talkativeness: 7 },
   backstory:
-    "Ex-banker turned café owner. Analytical, reads every line of the invoice, and keeps changing his mind on settings while asking about ROI.",
-  goals: ["Proof of ROI before spending more", "Granular control over his campaign"],
-  objections: [
-    "How do I know these impressions are real people?",
-    "What's my cost per actual order, not per click?",
-  ],
-  tactics: ["Asks for the same number three different ways", "Requests changes, then reverses them"],
-  speechStyle: { pace: "normal", interrupts: false, catchphrases: ["Walk me through the math."] },
-  crmRequests: [
-    { id: "req_cats", field: "adCategories", value: ["dine_in", "offers"], phrasing: "Only run dine-in and offers, drop delivery." },
-    { id: "req_budget2", field: "monthlyBudget", value: 20000, phrasing: "Let's try 20,000 a month and see." },
-  ],
-  openingLine: "Hello. I had a few questions about my last invoice, actually.",
-  source: "seed",
-  sourceCallId: null,
-  createdAt: CREATED,
-};
+    "Has a grievance with the platform and brings it up before anything else. Only starts listening once the rep shows real empathy and promises to help. Without that, gets angrier and ends the call.",
+  goals: ["Be heard", "Get the problem looked into", "Not waste money again"],
+  objections: ["Every time you call it's to sell me something.", "Last time I paid for ads and got nothing."],
+  tactics: ["Opens with the complaint and keeps returning to it", "Tests whether the rep is actually listening"],
+  speechStyle: { pace: "normal", interrupts: true, catchphrases: ["Koi sunta hi nahi.", "Pehle meri baat suno."] },
+  openingLine: "Hello? Haan, ab kya hai?",
+});
 
-/** What Tushar's extraction should produce from `fixtures/live-call.ts`. */
+export const undecided = preset({
+  id: "persona_undecided",
+  name: "Hesitant / Not Sure",
+  archetype: "undecided",
+  traits: { patience: 7, aggression: 1, priceSensitivity: 6, talkativeness: 5 },
+  backstory:
+    "Polite and positive about the idea but not ready to commit on this call. Wants time to think or to talk to someone first. Ends with 'send me the details' or 'call me later' unless the rep gives a genuinely convincing reason.",
+  goals: ["Not commit on the spot", "Get the details in writing"],
+  objections: ["Let me think about it.", "I'll need to discuss it first.", "Can you send me the details?"],
+  tactics: ["Agrees with everything but won't say yes", "Asks for the details by email"],
+  speechStyle: { pace: "slow", interrupts: false, catchphrases: ["Dekhte hain.", "Sochke batata hoon."] },
+  openingLine: "Hello ji, boliye?",
+});
+
+/** What Tushar's extraction should produce from `fixtures/live-call.ts`. Plays with its own identity. */
 export const suresh: Persona = {
   id: "persona_suresh_live",
   name: "Suresh Patil",
   role: "Owner, Patil Misal House",
-  business: { type: "restaurant", city: "Nashik", currentPlan: "Basic Ads, ₹25,000/mo" },
+  business: { type: "restaurant", city: "Nashik" },
   archetype: "price_squeezer",
   language: "hinglish",
   voiceId: VOICES.rehan,
@@ -131,11 +138,12 @@ export const suresh: Persona = {
     interrupts: true,
     catchphrases: ["Commission bahut zyada hai, bhai.", "Kal tak chalu karo warna main cancel karta hoon."],
   },
-  crmRequests: [{ id: "req_plan", field: "plan", value: "premium", phrasing: "Premium pe daal do agar rate theek hai." }],
+  crmRequests: [],
   openingLine: "Haan hello, main Suresh bol raha hoon, Patil Misal se. Commission ke baare mein baat karni thi.",
   source: "live_call",
   sourceCallId: "call_live_demo",
   createdAt: "2026-10-10T09:05:00.000Z",
 };
 
-export const personas: Persona[] = [rakesh, arjun, vikram, suresh];
+export const PERSONA_PRESETS: Persona[] = [curious, skeptic, bargainer, busy, frustrated, undecided];
+export const personas: Persona[] = [...PERSONA_PRESETS, suresh];

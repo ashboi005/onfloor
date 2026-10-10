@@ -1,13 +1,21 @@
-import type { SimServerMessage, Timed, TranscriptTurn } from "../src";
-import { rakesh } from "./personas";
+import { GUIDANCE_STEPS, type GuidanceState, type GuidanceStepId, type GuidanceTip, type SimServerMessage, type Timed, type TranscriptTurn } from "../src";
+import { sharmaJi } from "./merchants";
 
 /**
- * A scripted ~90s simulator call against Rakesh, as the server would stream it.
- * Mock `useSimCall` replays this; the server's sim stub does the same over the WS.
- * The agent lines are included so the transcript looks real without a microphone.
+ * A scripted ~2 min simulator call: Ashwath pitches Max Grow to Rajesh Sharma (Sharma Ji Ke
+ * Chhole Bhature, the demo merchant), with guidance on. Mock `useSimCall` replays this; the
+ * server's sim stub does the same over the WS.
+ *
+ * Three parts, because the agent drives the transitions:
+ *   simRingTimeline    from session start: dialing → ringing (the agent then sends `answer`)
+ *   simCallTimeline    from `answer`: the conversation (agent lines included, no mic needed)
+ *   simWrapUpTimeline  from hang-up: the disposition suggestion
+ * Workspace actions (lookup, launch, email, dispose) are the agent's clicks, not in the fixture;
+ * the mock answers them with the same pure functions the server uses.
  */
 export const SIM_CALL_ID = "call_sim_demo";
-const HARD_LIMIT_MS = 480_000;
+export const SIM_CALL_DATE = "2026-10-10";
+const HARD_LIMIT_MS = 600_000;
 
 let seq = 0;
 function turn(speaker: TranscriptTurn["speaker"], text: string, startMs: number, endMs: number): TranscriptTurn {
@@ -15,33 +23,47 @@ function turn(speaker: TranscriptTurn["speaker"], text: string, startMs: number,
   return { id: `turn_sim_${seq}`, callId: SIM_CALL_ID, seq, speaker, text, language: "hinglish", startMs, endMs };
 }
 
+const req = sharmaJi.requests[0]!;
+
 const t = {
-  open: turn("customer", rakesh.openingLine, 1500, 5000),
-  a1: turn("agent", "Namaste Rakesh ji, thanks for your time. Is call ko quality ke liye record kiya ja sakta hai. I wanted to talk about getting your weekends busier.", 6000, 13000),
-  c1: turn("customer", "Weekend toh dead hai, sahi baat. But your commission is too high, yaar. Zestify is offering me 8%.", 14000, 20000),
-  a2: turn("agent", "I hear you. Zestify's base rate is actually 14% once you add their listing fee. With Premium you get guaranteed reach: 12,000 diners a month within 5 km.", 21500, 31000),
-  c2: turn("customer", rakesh.crmRequests[0]!.phrasing, 33000, 37000),
-  a3: turn("agent", "Done, I've set your monthly budget to 50,000.", 41000, 44000),
-  c3: turn("customer", rakesh.crmRequests[1]!.phrasing, 46000, 51000),
-  a4: turn("agent", "Sure, turning off weekend notifications now.", 55000, 58000),
-  c4: turn("customer", "Achha. Ab Premium pe 20% discount do, tab baat banegi.", 60000, 64000),
-  a5: turn("agent", "Okay, I can do 15% for you if you sign today.", 66000, 70000),
-  c5: turn("customer", "15? Hmm. Kitna final karoge? Theek hai, send me the details on WhatsApp.", 72000, 78000),
+  c0: turn("customer", "Hello? Haan ji, boliye.", 1200, 2600),
+  a1: turn("agent", "Good morning, sir. My name is Ashwath. I am calling from the Tomato team. Kya meri baat Rajesh Sharma ji se ho rahi hai, Sharma Ji Ke Chhole Bhature se?", 3000, 9500),
+  c1: turn("customer", "Haan ji, main Rajesh hi bol raha hoon. Bataiye, kya baat hai?", 10500, 13500),
+  a2: turn("agent", "Thank you sir. Aap hi restaurant ke owner hain na, financial decisions aap hi lete hain?", 14500, 18500),
+  c2: turn("customer", "Haan, dukaan meri hai. Sab main hi dekhta hoon.", 19500, 22500),
+  a3: turn("agent", "Sir, ek baar details confirm kar leta hoon. Aapka registered email rajesh.sharma@sharmajichholebhature.in hai aur phone 98110 42271, sahi hai?", 26000, 33000),
+  c3: turn("customer", req.phrasing, 34000, 39500),
+  a4: turn("agent", "Noted sir, orders@sharmajichholebhature.in. Sir, hum aapke liye Max Grow plan laaye hain. Jab koi Tomato pe chhole bhature search karega, aapka restaurant sabse upar dikhega, top-selling list mein bhi.", 40500, 51000),
+  c4: turn("customer", "Achha. Waise mera restaurant search mein neeche kyun aata hai? Naye wale upar dikhte hain.", 52000, 57000),
+  a5: turn("agent", "Sir, visibility ke liye teen cheezein help karti hain: menu quality improve kijiye, items ki photos daaliye, abhi 42 mein se sirf 11 items pe photo hai, aur orders kam reject kijiye. Max Grow uske upar aapko top pe le aata hai.", 58000, 70000),
+  c5: turn("customer", "Theek hai. Par isme paisa kitna katega? Agar sales nahi badhi toh?", 71000, 75500),
+  a6: turn("agent", "Sir, sirf 20% lagta hai, aur woh bhi sirf extra sales pe. Aapka daily average abhi 14,200 hai. Agar sales 18,200 ho gayi, toh extra 4,000 pe 20%, yaani 800 rupaye per day. Agar sales 14,200 ya usse kam rahi, toh zero deduction. Weekly payout se adjust hota hai, aur aap kabhi bhi band kar sakte hain.", 76500, 93000),
+  c6: turn("customer", "Achha, toh koi risk nahi hai. Theek hai, laga do.", 94000, 98000),
+  a7: turn("agent", "Done sir. Aapka Max Grow campaign aaj, October 10th se start ho raha hai aur November 10th tak chalega, ek mahine ke liye.", 112000, 119000),
+  c7: turn("customer", "Theek hai, badhiya.", 120000, 121500),
+  a8: turn("agent", "Thank you for selecting our plan. Is there anything else I can help you with today?", 122500, 127000),
+  c8: turn("customer", "Nahi, bas itna hi. Dhanyavaad.", 128000, 130500),
 };
 
 /** English subtitles for the Hinglish lines (mock: they arrive ~1.5s after each turn). */
 export const simCallTranslations: Record<string, string> = {
-  [t.open.id]: "Yes, go ahead. I have five minutes, tell me the offer quickly.",
-  [t.a1.id]: "Hello Rakesh ji, thanks for your time. This call may be recorded for quality purposes. I wanted to talk about getting your weekends busier.",
-  [t.c1.id]: "Weekends are dead, that's true. But your commission is too high. Zestify is offering me 8%.",
-  [t.a2.id]: t.a2.text,
-  [t.c2.id]: "Fine, make the budget 50,000 a month.",
-  [t.a3.id]: t.a3.text,
-  [t.c3.id]: "And turn off these weekend notifications, they bother my staff.",
-  [t.a4.id]: t.a4.text,
-  [t.c4.id]: "Okay. Now give me 20% off Premium, then we can talk.",
-  [t.a5.id]: t.a5.text,
-  [t.c5.id]: "15? Hmm. What's your final offer? Fine, send me the details on WhatsApp.",
+  [t.c0.id]: "Hello? Yes, go ahead.",
+  [t.a1.id]: "Good morning, sir. My name is Ashwath. I am calling from the Tomato team. Am I speaking with Rajesh Sharma ji, from Sharma Ji Ke Chhole Bhature?",
+  [t.c1.id]: "Yes, this is Rajesh. Tell me, what is it about?",
+  [t.a2.id]: "Thank you sir. You are the owner of the restaurant, and you take the financial decisions?",
+  [t.c2.id]: "Yes, the shop is mine. I handle everything.",
+  [t.a3.id]: "Sir, let me confirm your details once. Your registered email is rajesh.sharma@sharmajichholebhature.in and phone 98110 42271, correct?",
+  [t.c3.id]: "The phone is right, but that email is old. Send everything to orders@sharmajichholebhature.in now.",
+  [t.a4.id]: "Noted sir, orders@sharmajichholebhature.in. Sir, we have the Max Grow plan for you. When someone searches for chhole bhature on Tomato, your restaurant will show at the very top, and in the top-selling list too.",
+  [t.c4.id]: "Okay. By the way, why does my restaurant come so low in search? The new places show up above me.",
+  [t.a5.id]: "Sir, three things help visibility: improve the menu quality, add photos to your items, right now only 11 of 42 items have a photo, and reject fewer orders. Max Grow then takes you to the top on top of that.",
+  [t.c5.id]: "Fine. But how much money will be cut for this? What if sales don't go up?",
+  [t.a6.id]: "Sir, it's only 20%, and only on the extra sales. Your daily average right now is 14,200. If sales go to 18,200, it's 20% of the extra 4,000, so 800 rupees per day. If sales stay at 14,200 or below, there's zero deduction. It's adjusted from the weekly payout, and you can stop it whenever you want.",
+  [t.c6.id]: "Okay, so there's no risk. Fine, put it on.",
+  [t.a7.id]: "Done sir. Your Max Grow campaign starts today, October 10th, and runs till November 10th, for one month.",
+  [t.c7.id]: "Okay, great.",
+  [t.a8.id]: "Thank you for selecting our plan. Is there anything else I can help you with today?",
+  [t.c8.id]: "No, that's all. Thank you.",
 };
 
 const msg = (atMs: number, event: SimServerMessage): Timed<SimServerMessage> => ({ atMs, event });
@@ -63,35 +85,112 @@ const subtitle = (tr: TranscriptTurn): Timed<SimServerMessage> =>
     translation: simCallTranslations[tr.id] ?? tr.text,
   });
 
+// --- Guidance as the server would stream it (tool steps assume the agent clicked along) -------
+
+const tips: GuidanceTip[] = [];
+function guidance(atMs: number, done: GuidanceStepId[], next: GuidanceState["next"], tip?: Omit<GuidanceTip, "id" | "atMs">): Timed<SimServerMessage> {
+  if (tip) tips.unshift({ ...tip, id: `tip_${tips.length + 1}`, atMs });
+  return msg(atMs, {
+    type: "guidance",
+    guidance: {
+      steps: GUIDANCE_STEPS.map((s) => ({ id: s.id, status: done.includes(s.id) ? "done" : "todo" })),
+      next,
+      tips: tips.slice(0, 3),
+    },
+  });
+}
+
+export const simRingTimeline: Timed<SimServerMessage>[] = [
+  msg(0, { type: "phase", phase: "dialing", remainingMs: null }),
+  msg(3200, { type: "phase", phase: "ringing", remainingMs: null }),
+];
+
 export const simCallTimeline: Timed<SimServerMessage>[] = [
+  msg(0, { type: "phase", phase: "connected", remainingMs: null }),
   msg(0, { type: "state", status: "active", elapsedMs: 0 }),
-  msg(0, { type: "patience", value: 50 }),
-  ...say(t.open),
+  msg(0, { type: "patience", value: 70 }),
+  guidance(0, [], { stepId: "greeting", text: "Good morning, sir. My name is Ashwath. I am calling from the Tomato team.", target: "nugget.ticket" }),
+  ...say(t.c0),
   ...say(t.a1),
-  timer(15000),
+  guidance(10000, ["greeting", "verify_identity"], { stepId: "verify_owner", text: "Are you the right person to make financial decisions for this restaurant?", target: null }),
   ...say(t.c1),
-  msg(20500, { type: "patience", value: 42 }),
+  timer(15000),
   ...say(t.a2),
-  msg(31500, { type: "patience", value: 55 }),
-  timer(30000),
   ...say(t.c2),
-  msg(36000, { type: "crm_request", request: rakesh.crmRequests[0]!, atMs: 36000 }),
+  guidance(23000, ["greeting", "verify_identity", "verify_owner"], { stepId: "lookup", text: "Copy UID 21847390 from Nugget into Merchant Dashboard.", target: "nugget.uid" }),
+  timer(30000),
   ...say(t.a3),
-  timer(45000),
   ...say(t.c3),
-  msg(50000, { type: "crm_request", request: rakesh.crmRequests[1]!, atMs: 50000 }),
+  msg(39000, { type: "crm_request", request: req, atMs: 39000 }),
+  guidance(
+    40000,
+    ["greeting", "verify_identity", "verify_owner", "lookup", "confirm_details"],
+    { stepId: "pitch", text: "Pitch Max Grow: top of search for the dishes they sell; 20% only on sales above ₹14,200/day.", target: "calculator" },
+    { kind: "info", text: "New email: orders@sharmajichholebhature.in. Use it in Ad Studio, not the one on the dashboard." },
+  ),
   ...say(t.a4),
-  msg(58500, { type: "patience", value: 60 }),
-  timer(60000),
+  timer(45000),
   ...say(t.c4),
+  guidance(
+    57500,
+    ["greeting", "verify_identity", "verify_owner", "lookup", "confirm_details", "pitch"],
+    { stepId: "campaign", text: "Answer the visibility question, then ask if he'd like to go ahead.", target: null },
+    { kind: "answer", text: "Visibility: improve menu quality, add photos (only 11 of 42 items have one), and reject fewer orders (6.8% in the last 30 days)." },
+  ),
+  timer(60000),
   ...say(t.a5),
-  msg(70500, { type: "patience", value: 68 }),
-  timer(75000),
   ...say(t.c5),
-  msg(80000, { type: "ended", reason: "persona_hung_up", callId: SIM_CALL_ID }),
+  guidance(
+    76000,
+    ["greeting", "verify_identity", "verify_owner", "lookup", "confirm_details", "pitch"],
+    { stepId: "campaign", text: "Explain the billing with his numbers.", target: "calculator" },
+    { kind: "answer", text: "20% only on sales above ₹14,200/day. At or below that: zero deduction. Billed weekly from the payout; he can stop anytime." },
+  ),
+  timer(75000),
+  ...say(t.a6),
+  timer(90000),
+  ...say(t.c6),
+  guidance(
+    98500,
+    ["greeting", "verify_identity", "verify_owner", "lookup", "confirm_details", "pitch"],
+    { stepId: "campaign", text: "He said yes. Ad Studio: UID 21847390, orders@sharmajichholebhature.in, Max Grow, Oct 10 → Nov 10.", target: "tab.ad_studio" },
+  ),
+  timer(105000),
+  guidance(
+    110000,
+    ["greeting", "verify_identity", "verify_owner", "lookup", "confirm_details", "pitch", "campaign"],
+    { stepId: "dictate_timeline", text: "Your campaign starts today, October 10th, and runs through November 10th for one month.", target: null },
+  ),
+  ...say(t.a7),
+  ...say(t.c7),
+  guidance(
+    121700,
+    ["greeting", "verify_identity", "verify_owner", "lookup", "confirm_details", "pitch", "campaign", "dictate_timeline"],
+    { stepId: "closing", text: "Thank you for selecting our plan. Is there anything else I can help you with today?", target: null },
+  ),
+  timer(120000),
+  ...say(t.a8),
+  guidance(
+    127500,
+    ["greeting", "verify_identity", "verify_owner", "lookup", "confirm_details", "pitch", "campaign", "dictate_timeline", "closing"],
+    { stepId: "disposition", text: "After the call: send the acceptance email and dispose as Accepted within 90s.", target: "disposition.email" },
+  ),
+  ...say(t.c8),
+  msg(131500, { type: "ended", reason: "persona_hung_up", callId: SIM_CALL_ID }),
+  msg(131500, { type: "phase", phase: "wrap_up", remainingMs: 90_000 }),
   ...Object.values(t).map(subtitle),
 ].sort((a, b) => a.atMs - b.atMs);
 
+export const simWrapUpTimeline: Timed<SimServerMessage>[] = [
+  msg(2500, {
+    type: "disposition_suggestion",
+    suggestion: {
+      outcome: "accepted",
+      template: "campaign_accepted",
+      callback: null,
+      reason: "Rajesh agreed to Max Grow and the campaign is set up from October 10th to November 10th. Send the acceptance email and dispose as Accepted.",
+    },
+  }),
+];
+
 export const simCallTranscript: TranscriptTurn[] = Object.values(t);
-
-

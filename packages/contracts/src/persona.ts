@@ -1,12 +1,14 @@
 import { z } from "zod";
-import { crmRequestSchema } from "./crm";
+import { crmRequestSchema } from "./tomato";
 import { ARCHETYPES, LANGUAGES, PERSONA_SOURCES } from "./domain";
 
 /**
- * The Pillar 1 ⇄ Pillar 2 seam.
+ * The Pillar 1 ⇄ Pillar 2 seam: HOW a customer behaves.
  *
- * Seed personas are written by Ashwath; live-call personas by Tushar's extraction
- * step. The simulator plays any row of this shape, which is the whole replay feature.
+ * Seed personas are behaviour presets (archetype, traits, objections, tactics) that the picker
+ * pairs with a merchant profile (`Merchant`: WHO they are and their restaurant's data). Live-call
+ * personas come from Tushar's extraction and carry their own identity; the simulator derives a
+ * merchant profile for them on replay. The simulator plays any row of this shape.
  */
 const trait = z.number().min(0).max(10);
 
@@ -41,6 +43,7 @@ export const personaSchema = z.object({
     /** Verbatim lines. For live-call personas these come straight from the transcript. */
     catchphrases: z.array(z.string()),
   }),
+  /** Asks they make during the call (email change, start date, duration, callback slot). Audited against the tools. */
   crmRequests: z.array(crmRequestSchema),
   openingLine: z.string(),
   source: z.enum(PERSONA_SOURCES),
