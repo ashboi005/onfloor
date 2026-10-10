@@ -163,6 +163,12 @@ Mastra + Qdrant (`VECTOR_DATABASE_URL`), Gemini embeddings via the key pool. Sco
 (playbook), `golden`, `agent`, `customer`. Wired: grounded judge, agent weak spots in the simulator
 prompt, customer memory at live-call start, automatic write-back after scoring. ✅ Done.
 
+### D11. Custom personas + English subtitles ✅
+- Persona tuning (`startSim({ tuning })`, `POST /api/personas` → `source: "custom"`), tone driven by aggression.
+- Subtitles: job `translate` pinned to Merge (`MERGE_MODEL_TRANSLATE=gpt-5.4-mini`, no Gemini fallback),
+  `modules/translation` (ordered per call, context lines, idiom hints), `transcript_turns.translation`,
+  `turn_translation` / `transcript_translation` events, `lib/subtitles.ts` for the UI toggle.
+
 ## What you hand to others, and when
 
 | To | What | By |

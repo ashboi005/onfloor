@@ -62,7 +62,9 @@ state (polling, nice skeleton). Then:
   "N/A for live calls".
 - **Timeline bar:** call duration with coloured markers for `moments` (mistake = red,
   warning = amber, good = green). Clicking one jumps to that turn.
-- **Interactive transcript:** turns with timestamps `mm:ss`. Turns that have a moment get
+- **Interactive transcript:** add the **Original | English** subtitle toggle (`useSubtitleMode` +
+  `subtitleText` from `@/lib/subtitles`; `GET /api/calls/:id` turns include `translation`, see
+  `04-harnoor-frontend.md` "Subtitles"). Turns with timestamps `mm:ss`. Turns that have a moment get
   highlighted with the moment's title inline. Expand to see **"Golden Standard"**:
   *You said* ➜ *A top rep would say* (`goldenLine`).
 - **CRM audit table** (sim only): field, expected, actual, ✓/✗, latency.

@@ -21,7 +21,21 @@ promote it to `ui/` later.
   archetype badge, traits as small bars, the language, and a "From live call" badge when
   `source === "live_call"`.
 - Language select (en / hi / Hinglish).
-- "Start call" → `useStartSim().mutate({ scenarioId, personaId, language })` →
+- **Persona tuning panel ("Customize")** (new): lets the trainer reshape the selected persona
+  before the call. Controls map 1:1 to `PersonaTuning` (`@onfloor/contracts`):
+  - **Archetype**: impatient / price-squeezer / skeptic (`ARCHETYPE_LABELS`)
+  - **Sliders 0–10**: patience, aggression ("politeness ↔ hostility"), price sensitivity,
+    talkativeness. Show the tone the aggression value produces next to the slider: 0–3 *polite*,
+    4–6 *firm but civil*, 7–8 *blunt*, 9–10 *confrontational*. (The default personas felt too rude;
+    this is the knob for that.)
+  - **Speech**: pace (slow/normal/fast), interrupts (on/off)
+  - **Voice**: optional pick from `VOICES` (fixtures)
+  Preview the effective persona with `applyPersonaTuning(persona, tuning)` (pure, runs in the browser).
+  Start with `useStartSim().mutate({ scenarioId, personaId, language, tuning })`; the tuning applies to
+  that call only. Also offer **"Save as new persona"**:
+  `useCreatePersona().mutate({ ...applyPersonaTuning(persona, tuning), name })` (strip `id`/`createdAt`).
+  The server stores it as `source: "custom"`; show a "Custom" badge for those in the list.
+- "Start call" → `useStartSim().mutate({ scenarioId, personaId, language, tuning })` →
   navigate to `/simulator/[callId]`.
 - Deep link `/simulator/new?replay=<callId>` → `useReplayCall` (Mansukh's persona and
   scorecard pages link here).
@@ -52,11 +66,30 @@ Two panes, side by side on a laptop (CRM ≈ 60%, call ≈ 40%):
   `personaState` (thinking dots / speaking wave).
 - **Patience meter** (`patience` 0–100, green → amber → red, shakes when it drops).
 - Live transcript: committed turns + `partialAgentText` greyed out. Auto-scroll.
+  With the **Original | English** subtitle toggle (below).
 - Controls: mute, end call (confirm), push-to-talk not needed (VAD is automatic).
 - States: connecting, mic denied, error with retry, persona hung up ("Rakesh hung up 😬"
   → button to scorecard).
 - On end → `await end()` → `/calls/[callId]` (Mansukh's scorecard page, which shows a
   "scoring…" state while it polls).
+
+### Subtitles in the call terminal
+
+**Subtitles (raw ↔ English).** Every transcript turn has an optional `turn.translation`: the
+English version. It's the same as the text for English calls; for Hindi/Hinglish it arrives **1–2.5s
+after the turn** (Merge, never Gemini) and the hook merges it in automatically. Use the shared helper so
+every screen behaves the same and the choice is remembered:
+
+```ts
+import { subtitleText, useSubtitleMode } from "@/lib/subtitles";
+const [mode, setMode] = useSubtitleMode();            // "raw" | "english" (saved per browser)
+const { text, pending } = subtitleText(turn, mode);   // pending = English not here yet
+```
+
+Put a small toggle (`Original | English`) above the transcript. In English mode show `pending` lines in
+their raw text, dimmed, with a "translating…" hint, then swap in place when the subtitle lands (no layout
+jump). Live partials are always raw (they're never translated). Mock mode has delayed subtitles in the
+timeline, so you can build this now.
 
 ## ~~Screen 3: Live HUD~~: moved to Tushar
 

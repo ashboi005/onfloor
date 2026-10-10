@@ -204,7 +204,28 @@ call. It auto-attaches with `useLiveCall("active")`.
 - **Talk metrics:** talk-ratio bar (agent vs customer), silence counter that turns
   amber at 4s and fires a "Say something — dead air" nudge on `alert: "dead_air"`.
   `monologue` → "Pause and ask a question".
-- **Mini transcript** (right rail): last ~6 turns + partials, speaker colours.
+- **Mini transcript** (right rail): last ~6 turns + partials, speaker colours, with the
+  **Original | English** subtitle toggle:
+
+  **Subtitles (raw ↔ English).** Every transcript turn has an optional `turn.translation`: the
+  English version. It's the same as the text for English calls; for Hindi/Hinglish it arrives **1–2.5s
+  after the turn** (Merge, never Gemini) and the hook merges it in automatically. Use the shared helper so
+  every screen behaves the same and the choice is remembered:
+  
+  ```ts
+  import { subtitleText, useSubtitleMode } from "@/lib/subtitles";
+  const [mode, setMode] = useSubtitleMode();            // "raw" | "english" (saved per browser)
+  const { text, pending } = subtitleText(turn, mode);   // pending = English not here yet
+  ```
+  
+  Put a small toggle (`Original | English`) above the transcript. In English mode show `pending` lines in
+  their raw text, dimmed, with a "translating…" hint, then swap in place when the subtitle lands (no layout
+  jump). Live partials are always raw (they're never translated). Mock mode has delayed subtitles in the
+  timeline, so you can build this now.
+
+  Server side this already works for live calls: `appendLiveTurn()` fires `translateTurn()` and emits
+  `transcript_translation` (3 lines added by Ashwath in your `session.ts`, marked `[added by Ashwath]`;
+  keep them if you refactor). Translations are also saved, so `GET /api/calls/:id` returns them.
 - **After the call:** "Scoring…" → when `scorecardReady`, a "View scorecard" button
   (`/calls/[id]`). When `personaId` arrives, a celebratory card: "Persona created from
   this call → Replay in simulator" (`/simulator/new?replay=<callId>`). This is demo

@@ -64,6 +64,14 @@ personaSchema = z.object({
 createPersonaSchema = personaSchema.omit({ id: true, createdAt: true })
 ```
 
+### Persona tuning & custom personas (added 2026-10-10)
+
+`personaTuningSchema` (all optional): `archetype`, `traits` (any of the four, 0–10), `speechStyle`
+(`pace`, `interrupts`), `voiceId`. `applyPersonaTuning(persona, tuning)` returns the effective persona.
+`startSim({ ..., tuning })` applies it to one call; `POST /api/personas` saves one (always stored as
+`source: "custom"`). `PERSONA_SOURCES` = `seed | live_call | custom`. Tone follows `traits.aggression`
+(0–3 polite … 9–10 confrontational).
+
 ## 3. Mock CRM (`crm.ts`)
 
 The CRM is a *merchant ad portal*. Its fields are fixed for the MVP.
@@ -126,6 +134,7 @@ transcriptTurnSchema = z.object({
   language: z.enum(LANGUAGES).optional(),
   startMs: z.number().int(),
   endMs: z.number().int(),
+  translation: z.string().optional(),  // English subtitle: = text for English calls; filled 1–2.5s later for hi/hinglish
 })
 ```
 
@@ -254,6 +263,7 @@ Server → client:
 ```ts
 { type: "state", status, elapsedMs }
 { type: "turn", turn: TranscriptTurn }         // committed turns, both speakers
+{ type: "turn_translation", turnId, translation }  // English subtitle for an earlier turn (Hindi/Hinglish, 1–2.5s later)
 { type: "persona_audio", turnId, audioUrl }
 { type: "persona_state", state: "idle" | "thinking" | "speaking" }
 { type: "crm_request", request: CrmRequest, atMs }  // persona just asked for a change
@@ -270,6 +280,7 @@ Server → client:
 ```ts
 { type: "call_started", call: Call }
 { type: "customer_memory", customerLabel, items: { text, source, at }[] }   // RAG, right after call_started; [] = first call
+{ type: "transcript_translation", turnId, translation }                    // English subtitle for an earlier final (1–2.5s later)
 { type: "transcript_partial", speaker, text }        // in-flight, overwrite per speaker
 { type: "transcript_final", turn: TranscriptTurn }
 { type: "hint", hint: {
