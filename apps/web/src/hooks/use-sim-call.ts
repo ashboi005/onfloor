@@ -172,6 +172,8 @@ function reducer(s: SimCallState, a: Action): SimCallState {
       const m = a.msg;
       switch (m.type) {
         case "phase":
+          // "done" is final: a late countdown tick must not reopen the wrap-up.
+          if (s.phase === "done") return s;
           return {
             ...s,
             phase: m.phase,

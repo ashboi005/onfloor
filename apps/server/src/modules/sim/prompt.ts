@@ -239,6 +239,7 @@ export function parseReply(raw: string): ParsedReply {
     .replace(/<[^>]*>/g, " ")
     .replace(/\[(call note|neutral|warm|pleased|skeptical|firm|impatient)[^\]]*\]/gi, " ")
     .replace(/^\s*["“]|["”]\s*$/g, "")
+    .replace(/(\S)_(\S)/g, "$1 $2") // stray snake_case joins ("The_email") would be read out oddly
     .replace(/\s+/g, " ")
     .trim();
   return {

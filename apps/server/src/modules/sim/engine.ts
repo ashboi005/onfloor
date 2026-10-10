@@ -110,6 +110,8 @@ interface Session {
   sockets: Set<Send>;
   phase: SimPhase;
   started: boolean;
+  /** The conversation is being ended (set synchronously, before any await). */
+  ending: boolean;
   finished: boolean;
   /** Epoch ms of the call clock's zero (set again at `answer`). */
   startedAt: number;
@@ -192,6 +194,7 @@ function newSession(input: {
     sockets: new Set(),
     phase: "dialing",
     started: false,
+    ending: false,
     finished: false,
     startedAt: Date.now(),
     history: [],
@@ -864,7 +867,10 @@ async function tick(s: Session) {
 
 /** The conversation is over. Enough of a call → wrap-up (disposition window); otherwise abandoned. */
 async function endConversation(s: Session, reason: "agent" | "persona_hung_up" | "time" | "missed") {
-  if (s.finished || s.phase === "wrap_up" || s.phase === "done") return;
+  // Synchronous guard: the socket's "end" and REST /end can arrive together, and the awaits below
+  // would otherwise let both through (two wrap-ups, two countdowns).
+  if (s.finished || s.ending || s.phase === "wrap_up" || s.phase === "done") return;
+  s.ending = true;
   const wasConnected = s.phase === "connected";
   s.gen++;
   if (s.tick) clearInterval(s.tick);
