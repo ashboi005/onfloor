@@ -149,8 +149,13 @@ export function useLiveCall(callId: string | "active") {
       };
     };
     connect(0);
+    // Keepalive so idle periods (waiting for a call) don't hit the server's socket timeout.
+    const ping = setInterval(() => {
+      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
+    }, 30_000);
     return () => {
       closed = true;
+      clearInterval(ping);
       clearTimeout(retry);
       ws?.close();
     };

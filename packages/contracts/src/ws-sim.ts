@@ -23,6 +23,8 @@ export const simClientMessageSchema = z.discriminatedUnion("type", [
   /** The persona's audio for this turn finished playing (or failed). Starts the dead-air clock. */
   z.object({ type: z.literal("playback_ended"), turnId: z.string() }),
   z.object({ type: z.literal("end") }),
+  /** Keepalive, every 30s. Ignored by the server. */
+  z.object({ type: z.literal("ping") }),
 ]);
 export type SimClientMessage = z.infer<typeof simClientMessageSchema>;
 

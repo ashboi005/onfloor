@@ -218,7 +218,7 @@ the `x-bridge-secret` header instead. In mock mode the web client fakes a signed
 | POST | `/sim/sessions/:callId/end` | Ashwath | → `{ callId, status }` |
 | GET | `/calls` | Ashwath | `?kind=` → `Call[]` |
 | GET | `/calls/:id` | Ashwath | → `Call & { transcript: TranscriptTurn[] }` |
-| GET | `/calls/:id/scorecard` | Ashwath | → `Scorecard` (404 while scoring, so poll) |
+| GET | `/calls/:id/scorecard` | Ashwath | → `Scorecard`, or 202 `{ status }` while scoring (poll) |
 | POST | `/calls/:id/replay` | Ashwath | → `SimSessionStart` (replays that call's extracted persona) |
 | GET | `/live/active` | Tushar | → `Call \| null` (the HUD auto-attaches to this) |
 | WS | `/ws/live/:callId` | Tushar | see §10 |

@@ -144,7 +144,8 @@ function reducer(s: SimCallState, a: Action): SimCallState {
 /** Partials shorter than this don't count as the agent interrupting (echo leaks start small). */
 const BARGE_IN_MIN_CHARS = 6;
 const FRAME_SAMPLES = PCM_TARGET_RATE / 10; // ~100ms per STT frame
-const ACTIVITY_THROTTLE_MS = 1000;
+/** Must stay well under the server's AGENT_SETTLE_MS (1100ms). */
+const ACTIVITY_THROTTLE_MS = 300;
 
 const WORKLET_SOURCE = `
 class PcmCapture extends AudioWorkletProcessor {
@@ -224,23 +225,42 @@ export function useSimCall(start: SimSessionStart | null) {
       );
     }
 
-    const ws = new WebSocket(`${WS_URL}/ws/sim/${start.callId}`);
-    wsRef.current = ws;
-    ws.onmessage = (e) => {
-      const parsed = simServerMessageSchema.safeParse(JSON.parse(String(e.data)));
-      if (!parsed.success) return;
-      const msg = parsed.data;
-      if (msg.type === "turn" && msg.turn.speaker === "agent") {
-        // The server committed what we sent; drop it from the pending text.
-        committedRef.current = "";
-        dispatch({ type: "partial", text: "" });
-      }
-      if (msg.type === "turn" && msg.turn.speaker === "customer") lastPersonaTextRef.current = msg.turn.text;
-      if (msg.type === "persona_audio") void playPersona(msg.turnId, msg.audioUrl);
-      if (msg.type === "ended") stopPersonaAudio();
-      onMsg(msg);
+    let closed = false;
+    let attempts = 0;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const ping = setInterval(() => send({ type: "ping" }), 30_000);
+
+    const connect = () => {
+      const ws = new WebSocket(`${WS_URL}/ws/sim/${start.callId}`);
+      wsRef.current = ws;
+      ws.onopen = () => {
+        attempts = 0;
+      };
+      ws.onclose = () => {
+        // Reconnect while the call is live; the server replays the transcript on attach.
+        if (closed || endedRef.current) return;
+        if (attempts++ >= 5) {
+          onMsg({ type: "error", code: "WS_CLOSED", message: "Lost connection to the call.", retryable: false });
+          return;
+        }
+        retry = setTimeout(connect, Math.min(4000, 500 * 2 ** attempts));
+      };
+      ws.onmessage = (e) => {
+        const parsed = simServerMessageSchema.safeParse(JSON.parse(String(e.data)));
+        if (!parsed.success) return;
+        const msg = parsed.data;
+        if (msg.type === "turn" && msg.turn.speaker === "agent") {
+          // The server committed what we sent; drop it from the pending text.
+          committedRef.current = "";
+          dispatch({ type: "partial", text: "" });
+        }
+        if (msg.type === "turn" && msg.turn.speaker === "customer") lastPersonaTextRef.current = msg.turn.text;
+        if (msg.type === "persona_audio") void playPersona(msg.turnId, msg.audioUrl);
+        if (msg.type === "ended") stopPersonaAudio();
+        onMsg(msg);
+      };
     };
-    ws.onerror = () => onMsg({ type: "error", code: "WS_ERROR", message: "Lost connection to the call.", retryable: true });
+    connect();
 
     async function playPersona(turnId: string, audioUrl: string) {
       const ctx = ctxRef.current;
@@ -269,8 +289,11 @@ export function useSimCall(start: SimSessionStart | null) {
     }
 
     return () => {
+      closed = true;
+      clearInterval(ping);
+      clearTimeout(retry);
       stopPersonaAudio();
-      ws.close();
+      wsRef.current?.close();
       wsRef.current = null;
     };
   }, [start, send, stopPersonaAudio]);
@@ -294,15 +317,17 @@ export function useSimCall(start: SimSessionStart | null) {
     function onPartial(text: string) {
       if (!text) return;
       segmentStartRef.current ??= callMs();
+      const playing = playingRef.current;
+      // The persona's own voice leaking into the mic is not the agent talking.
+      if (playing && isEcho(text, playing.text)) return;
       dispatch({ type: "partial", text: `${committedRef.current} ${text}`.trim() });
       const now = Date.now();
       if (now - lastActivityRef.current > ACTIVITY_THROTTLE_MS) {
         lastActivityRef.current = now;
         send({ type: "agent_activity" });
       }
-      // Barge-in: the agent talks over the persona (but not the persona hearing itself).
-      const playing = playingRef.current;
-      if (playing && text.length >= BARGE_IN_MIN_CHARS && !isEcho(text, playing.text)) {
+      // Barge-in: the agent talks over the persona.
+      if (playing && text.length >= BARGE_IN_MIN_CHARS) {
         stopPersonaAudio();
         dispatch({ type: "persona_state", state: "idle" });
         send({ type: "interrupt" });

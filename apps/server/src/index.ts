@@ -25,7 +25,9 @@ import { auth } from "./services";
 
   NEVER add a catch-all `GET /*` route: it swallows /api/auth/* (elysia#1515).
 */
-const app = new Elysia()
+// Bun closes a socket after 120s without traffic by default; a call easily idles that long.
+// 960s is Bun's maximum. Clients also send a {type:"ping"} every 30s.
+const app = new Elysia({ websocket: { idleTimeout: 960 } })
   .use(errorPlugin)
   .use(
     cors({

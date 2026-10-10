@@ -43,14 +43,9 @@ export const httpClient: ApiClient = {
   persona: (id) => request(personaSchema, `/api/personas/${id}`),
   calls: (kind) => request(z.array(callSchema), `/api/calls${qs({ kind })}`),
   call: (id) => request(callWithTranscriptSchema, `/api/calls/${id}`),
-  async scorecard(callId) {
-    try {
-      return await request(scorecardSchema, `/api/calls/${callId}/scorecard`);
-    } catch (e) {
-      if (e instanceof ApiClientError && e.status === 404) return null;
-      throw e;
-    }
-  },
+  // 202 { status } while scoring → null (the hook keeps polling).
+  scorecard: (callId) =>
+    request(z.union([scorecardSchema, z.object({ status: z.string() }).transform(() => null)]), `/api/calls/${callId}/scorecard`),
   startSim: (input) => request(simSessionStartSchema, "/api/sim/sessions", post(input)),
   endSim: (callId) => request(endSimResponseSchema, `/api/sim/sessions/${callId}/end`, post()),
   simSttUrl: (callId) => request(z.object({ url: z.string() }), `/api/sim/sessions/${callId}/stt`, post()),

@@ -36,8 +36,12 @@ import { buildSystemPrompt, NUDGES, openingInstruction, parseReply, turnNote } f
 
 type Send = (msg: SimServerMessage) => void;
 
-/** Pause after the last STT commit before the persona answers. STT VAD already waits 0.6s. */
-const AGENT_SETTLE_MS = 700;
+/**
+ * Pause after the last STT commit before the persona answers (STT VAD already waits 0.6s).
+ * Long enough to bridge the pause between two sentences; measured: 700ms made the persona
+ * answer every sentence fragment separately. Must stay above the client's activity ping.
+ */
+const AGENT_SETTLE_MS = 1100;
 const DEAD_AIR_MS = 7000;
 const MONOLOGUE_MS = 25_000;
 const INTERRUPT_AFTER_MS = 20_000;
@@ -406,6 +410,13 @@ export async function handleClientMessage(callId: string, msg: SimClientMessage)
     case "agent_activity": {
       s.lastActivityAt = now;
       s.agentTalkStartedAt ??= now;
+      // Still talking: a reply being generated would cut them off mid-sentence. Drop it;
+      // the next settle answers everything they said.
+      if (s.replying && now >= s.personaSpeakingUntil) {
+        s.gen++;
+        s.replying = false;
+        broadcast(s, { type: "persona_state", state: "idle" });
+      }
       if (s.settleTimer) scheduleFlush(s);
       const talking = now - s.agentTalkStartedAt;
       if (s.persona.speechStyle.interrupts && talking > INTERRUPT_AFTER_MS && !s.replying) {

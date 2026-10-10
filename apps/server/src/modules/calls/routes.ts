@@ -3,7 +3,6 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import { authGuard } from "../../core/auth-guard";
 import { calls } from "../../core/calls";
-import { AppError } from "../../core/errors";
 import { getScorecard } from "../scoring";
 import { replayCall } from "../sim/engine";
 
@@ -23,13 +22,13 @@ export const callRoutes = new Elysia({ prefix: "/api/calls" })
     },
     { authed: true, params: idParam },
   )
-  /** 404 while scoring: the client polls. */
+  /** 202 `{ status }` while there's no scorecard yet (scoring / abandoned / failed): the client polls. */
   .get(
     "/:id/scorecard",
-    async ({ agent, params }) => {
-      await calls.getOwned(params.id, agent);
+    async ({ agent, params, status }) => {
+      const call = await calls.getOwned(params.id, agent);
       const card = await getScorecard(params.id);
-      if (!card) throw new AppError("NOT_FOUND", { message: "Still scoring." });
+      if (!card) return status(202, { status: call.status });
       return card;
     },
     { authed: true, params: idParam },
