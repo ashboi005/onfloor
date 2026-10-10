@@ -18,7 +18,6 @@ const toPersona = (r: Row): Persona => {
   const source = known(r.source) ? r.source : known(r.body.source) ? r.body.source : "seed";
   return { ...r.body, id: r.id, source, createdAt: r.createdAt.toISOString() };
 };
-};
 
 /**
  * Coerce request values onto the formats the tools audit expects (LLM extraction says
