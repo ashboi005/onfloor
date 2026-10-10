@@ -16,6 +16,8 @@ Authority: docs/specs/00-overview.md, 03-tushar-live.md, 03a-telegram-voice-guid
 - After incorporating Ashwath's updated base (`15f0940`, RAG spec and services), live calls emit the existing `customer_memory` event from the stable Telegram customer key or optional replay `customerId`. The copilot's LLM path retrieves up to three approved playbook facts and two customer-memory snippets; hints cite source titles. Keyword hints remain immediate and cite the OnFloor playbook. No shared contracts or provider services were changed by Tushar.
 - Focused behavior checks replace a broad permanent test suite, per the approved plan. Fresh read-only code review was completed; its delayed STT response, reconnect timing, decimal-discount and CRM evidence findings are fixed with regression checks.
 - Windows development cannot certify the separate macOS/Linux headset/Telegram spike. No actual private call, teardown directions or teammate demo assets are claimed here.
+- Bridge health belongs to the server-owned live event stream: `connecting` at session start, `connected` after bridge acknowledgement, `reconnecting` when the ingest socket drops inside the grace period, and `disconnected` when the ten-second grace period expires. This is control-plane health; the existing audio protocol remains unchanged. The event is not implemented yet because `packages/contracts` is frozen pending Ashwath's approval.
+- The HUD shows every unexpired or pinned hint at once, with the newest hint prominent. Each hint retains its own expiry countdown, pin/dismiss actions, and grounded source labels.
 
 ## Implementation map
 

@@ -91,4 +91,4 @@ For the demo, follow the bridge README feasibility checklist, prepare the two re
 
 ## Glossary
 
-Bridge: local Telegram/headset process. Session: server-owned lifecycle for one call. Channel: isolated agent/customer PCM. Replay: recorded audio paced through that lifecycle. Persona: validated customer behaviour reusable in the simulator.
+Bridge: local Telegram/headset process. Bridge status: server-observed ingest connection state, distinct from whether audio contains speech. Session: server-owned lifecycle for one call. Channel: isolated agent/customer PCM. Replay: recorded audio paced through that lifecycle. Persona: validated customer behaviour reusable in the simulator. Hint stack: all active copilot hints shown together, newest first, with independent expiry and controls.

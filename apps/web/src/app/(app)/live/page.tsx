@@ -65,7 +65,7 @@ export default function LiveHud() {
         </div>
       </header>
       <div className="shrink-0 px-4 pt-4 sm:px-6"><GuardrailBanner guardrails={live.guardrails} onDismiss={live.dismissGuardrail} /></div>
-      <main className="grid min-h-0 flex-1 gap-4 p-4 sm:p-6 xl:grid-cols-[280px_minmax(420px,1fr)_320px]">
+      <main className="grid min-h-0 flex-1 auto-rows-max gap-4 p-4 sm:p-6 xl:grid-cols-[280px_minmax(420px,1fr)_320px]">
         <aside className="flex min-h-0 flex-col gap-4"><SentimentRadar sentiment={live.sentiment} />{live.call && <CustomerMemory customerLabel={live.call.customerLabel} items={live.customerMemory} />}<TalkMetrics talk={live.talk} /></aside>
         <section className="flex min-h-0 flex-col gap-4"><HintStack hints={live.hints} now={now} onPin={live.pinHint} onDismiss={live.dismissHint} />{live.status === "ended" && <AfterCall live={live} />}{live.error && <div className="border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-200">{live.error}</div>}</section>
         <aside className="flex min-h-[360px] min-h-0 flex-col"><MiniTranscript turns={live.turns} partial={live.partial} /></aside>
