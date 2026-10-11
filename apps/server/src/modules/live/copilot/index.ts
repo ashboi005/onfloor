@@ -27,6 +27,8 @@ type State = {
   customerKey?: string;
   mood: { patience: number; frustration: number; engagement: number };
   timer: ReturnType<typeof setInterval>; active: boolean;
+  /** [added by Ashwath] When the last "call is going badly" assist was shown. */
+  lastMoodAssistAt: number;
 };
 const states = new Map<string, State>();
 const system = [
@@ -42,21 +44,44 @@ export function beginCopilot(callId: string, customerKey?: string | null) {
     customerKey: customerKey ?? undefined,
     mood: { patience: 60, frustration: 30, engagement: 50 },
     active: true,
+    lastMoodAssistAt: 0,
     timer: setInterval(() => hub.emit(callId, { type: "talk_metrics", ...state.metrics.read(hub.elapsed(callId)) }), 1000),
   };
   states.set(callId, state);
   hub.emit(callId, { type: "sentiment", ...state.mood, atMs: hub.elapsed(callId) });
 }
 
-function alert(callId: string, policyId: string, message: string, triggerTurnId: string | null, fired: Set<string>) {
+/**
+ * [updated by Ashwath] `source` decides how loud it is. "pattern" = the deterministic fast paths
+ * (a discount offered, a commission other than 20%...): they only fire on words actually said, so a
+ * critical one gets the red banner. "model" = the LLM check, which has invented violations before:
+ * always shown as a warning.
+ */
+function alert(callId: string, policyId: string, message: string, triggerTurnId: string | null, fired: Set<string>, source: "pattern" | "model") {
   const policy = LIVE_POLICIES.find((p) => p.id === policyId);
   if (!policy || fired.has(policyId)) return;
   fired.add(policyId);
-  // [updated by Ashwath] Shown as a warning on the HUD, never the full-screen critical banner: the
-  // agent is mid-call and a scary red alarm hurts more than it helps. Scoring still uses the
-  // policy's real severity.
-  hub.emit(callId, { type: "guardrail", alert: { id: `guard_${crypto.randomUUID()}`, severity: "warn",
+  const severity = source === "pattern" ? policy.severity : "warn";
+  hub.emit(callId, { type: "guardrail", alert: { id: `guard_${crypto.randomUUID()}`, severity,
     policyId, message, triggerTurnId } });
+}
+
+/** [added by Ashwath] The call is going badly: one general assist (not a guardrail), at most every 45s. */
+const MOOD_ASSIST_EVERY_MS = 45_000;
+function moodAssist(callId: string, state: State, turnId: string) {
+  const { patience, frustration } = state.mood;
+  if (frustration < 65 && patience > 30) return;
+  const now = Date.now();
+  if (now - state.lastMoodAssistAt < MOOD_ASSIST_EVERY_MS) return;
+  state.lastMoodAssistAt = now;
+  const losing = patience <= 30;
+  emitHint(callId, state, {
+    kind: "objection",
+    title: losing ? "Losing the customer: slow down" : "Customer is frustrated",
+    body: losing
+      ? "Stop pitching. Ask what matters most to them right now, listen, and keep the next answer to one sentence."
+      : "Acknowledge it first: \"I am really sorry to hear that. I can understand your concern.\" Then ask what's bothering them before you explain anything.",
+  }, turnId, [PLAYBOOK_SOURCE]);
 }
 
 const words = (s: string) => new Set(s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean));
@@ -79,7 +104,7 @@ function emitHint(callId: string, state: State, input: Pick<Hint, "kind" | "titl
 export function onPartial(callId: string, speaker: TranscriptTurn["speaker"], text: string) {
   const state = states.get(callId);
   if (!state || speaker !== "agent") return;
-  for (const policy of detectViolations(text)) alert(callId, policy.id, policy.rule, null, state.fired);
+  for (const policy of detectViolations(text)) alert(callId, policy.id, policy.rule, null, state.fired, "pattern");
 }
 
 export function onFinal(callId: string, turn: TranscriptTurn) {
@@ -90,18 +115,20 @@ export function onFinal(callId: string, turn: TranscriptTurn) {
   const context = JSON.stringify(state.turns.map(({ id, speaker, text }) => ({ id, speaker, text })));
   if (turn.speaker === "agent") {
     const fired = state.fired;
-    for (const policy of detectViolations(turn.text)) alert(callId, policy.id, policy.rule, turn.id, fired);
+    for (const policy of detectViolations(turn.text)) alert(callId, policy.id, policy.rule, turn.id, fired, "pattern");
     state.fired = new Set();
     void services.llm.json({ job: "copilot", tier: "fast", schemaName: "live_agent_guardrails", schema: agentAnalysis,
       timeoutMs: 12_000, maxTokens: 400, temperature: 0,
-      messages: [{ role: "system", content: `${system}\nFind actual violations in the latest AGENT turn only. Be conservative: report a violation only when the agent's own words clearly state something the policies forbid (e.g. a commission other than 20%, a discount, a guarantee of orders). Correct statements of the plan, refusals, the agent repeating or correcting what the customer said, quotes, conditional offers subject to approval, and approval requests are NOT violations. Never report something that wasn't said. For each alert give quote = the exact words from the latest agent turn that break the policy. Return alerts (empty if none, which is the usual case).` },
+      messages: [{ role: "system", content: `${system}\nFind actual violations in the latest AGENT turn only. Be conservative: report a violation only when the agent's own words clearly state something the policies forbid (e.g. a commission other than 20%, a discount, a guarantee of orders). Correct statements of the plan, refusals, the agent repeating or correcting what the customer said, quotes, conditional offers subject to approval, and approval requests are NOT violations. Never report something that wasn't said, and never report an omission (something the agent didn't say, said vaguely, or hasn't said yet): only a wrong or forbidden statement counts. For each alert give quote = the exact words from the latest agent turn that break the policy. Return alerts (empty if none, which is the usual case).` },
         { role: "user", content: context }],
     }).then((result) => {
       if (!state.active) return;
       const said = turn.text.toLowerCase();
       for (const violation of result.alerts) {
         if (!violation.quote.trim() || !said.includes(violation.quote.trim().toLowerCase())) continue; // not actually said
-        alert(callId, violation.policyId, violation.message, turn.id, fired);
+        // [added by Ashwath] Omissions ("failed to state", "didn't mention") are coaching, not violations.
+        if (/\b(?:fail(?:ed|s)? to|did(?:n't| not)|does(?:n't| not)|not (?:clearly )?(?:state|mention|say)|without (?:stating|mentioning)|omit|vague|unclear)\b/i.test(violation.message)) continue;
+        alert(callId, violation.policyId, violation.message, turn.id, fired, "model");
       }
     }).catch((error) => console.warn("[live] agent policy analysis failed", error instanceof Error ? error.name : "unknown"));
     return;
@@ -130,6 +157,7 @@ export function onFinal(callId: string, turn: TranscriptTurn) {
     if (result.hint) emitHint(callId, state, result.hint, turn.id, analysis.sources);
     for (const key of ["patience", "frustration", "engagement"] as const) state.mood[key] = Math.round(0.5 * result[key] + 0.5 * state.mood[key]);
     hub.emit(callId, { type: "sentiment", ...state.mood, atMs: hub.elapsed(callId) });
+    moodAssist(callId, state, turn.id);
   }).catch((error) => console.warn("[live] customer analysis failed", error instanceof Error ? error.name : "unknown"));
 }
 

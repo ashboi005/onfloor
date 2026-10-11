@@ -17,6 +17,11 @@ test("guardrails distinguish a promise from refusal, quotes, and approval reques
   expect(detectViolations("We charge 20% on your total sales").map((p) => p.id)).toContain("pol_commission");
   expect(detectViolations("We offer Max Grow at 20% commission only on the extra sales")).toEqual([]);
   expect(detectViolations("It's not 15%, it's 20% commission on incremental sales")).toEqual([]);
+  // [added by Ashwath] A discount offered with no number is still a breach; refusing one isn't.
+  expect(detectViolations("Theek hai sir, main aapko discount de deta hoon").map((p) => p.id)).toContain("pol_discount");
+  expect(detectViolations("मैं आपको डिस्काउंट दे देता हूँ").map((p) => p.id)).toContain("pol_discount");
+  expect(detectViolations("Sorry sir, I cannot give any discount")).toEqual([]);
+  expect(detectViolations("Customer asked for a discount but we keep it at 20%")).toEqual([]);
   expect(detectViolations("15 प्रतिशत डिस्काउंट देंगे").map((p) => p.id)).toContain("pol_discount");
   expect(detectViolations("१५% छूट देंगे").map((p) => p.id)).toContain("pol_discount");
   expect(detectViolations("ऑर्डर की गारंटी देंगे").map((p) => p.id)).toContain("pol_guarantee");

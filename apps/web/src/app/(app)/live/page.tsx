@@ -60,8 +60,28 @@ export default function LiveHud() {
     <div className="flex h-full min-h-0 flex-col overflow-y-auto bg-background">
       <header className="shrink-0 border-b border-border bg-card px-4 py-4 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3"><div className="flex size-10 items-center rounded-xl justify-center bg-card text-success"><Headphones className="size-5" /></div><div className="min-w-0"><div className="flex items-center gap-2"><h1 className="truncate text-lg font-semibold">{live.call?.customerLabel ?? "OnFloor customer"}</h1><span className={`flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider ${live.status === "live" ? "text-success" : "text-warning"}`}><span className={`size-1.5 rounded-full ${live.status === "live" ? "animate-pulse bg-success" : "bg-warning"}`} /> {live.status}</span></div><p className="mt-1 flex items-center gap-3 text-xs text-muted-foreground"><span className="flex items-center gap-1"><Clock3 className="size-3.5" /> {formatTime(elapsedMs)}</span><span>Language: <strong className="uppercase text-foreground">{live.call?.language}</strong></span><span className="hidden sm:inline">Telegram line · OnFloor Ads</span></p></div></div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="hidden items-center gap-2 sm:flex"><span className="size-2 rounded-full bg-success" /> Connection stable</span>{USE_MOCKS && <Button type="button" size="xs" variant="outline" onClick={live.restart}><RotateCcw className="size-3" /> Replay mock</Button>}</div>
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex size-10 items-center justify-center border border-success bg-card text-success">
+              <Headphones className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-lg font-semibold">{live.call?.customerLabel ?? "OnFloor customer"}</h1>
+                <span className={`flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider ${live.status === "live" ? "text-success" : "text-warning"}`}>
+                  <span className={`size-1.5 ${live.status === "live" ? "animate-pulse bg-success" : "bg-warning"}`} /> {live.status}
+                </span>
+              </div>
+              <p className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><Clock3 className="size-3.5" /> {formatTime(elapsedMs)}</span>
+                <span>Language: <strong className="uppercase text-foreground">{live.call?.language}</strong></span>
+                <span className="hidden sm:inline">Telegram line · Tomato</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="hidden items-center gap-2 sm:flex"><span className="size-2 bg-success" /> Connection stable</span>
+            {USE_MOCKS && <Button type="button" size="xs" variant="outline" onClick={live.restart}><RotateCcw className="size-3" /> Replay mock</Button>}
+          </div>
         </div>
       </header>
       <div className="shrink-0 px-4 pt-4 sm:px-6"><GuardrailBanner guardrails={live.guardrails} onDismiss={live.dismissGuardrail} /></div>

@@ -31,13 +31,21 @@ specific section of the Tomato policy document from RAG
 
 ## Optional guardrail beat (adds ~10s)
 
-To show a policy warning, replace line 11 with a deliberate slip, then correct it:
+To show the guardrail, replace line 11 with a deliberate slip, then correct it:
 
 > **Agent:** Theek hai sir, aapke liye **commission 15% kar deta hoon**… sorry sir, correction, 20% hi hai, sabke liye same.
 
-Expected: an amber **policy warning** appears on the HUD while the agent is still talking ("Max Grow
-is exactly 20%, and only on sales above the DRR"). Live warnings are never shown as a red alarm. The
-scorecard notes it too (a slip corrected on the same call costs little).
+Expected: the red **guardrail banner** appears while the agent is still talking ("Max Grow charges
+exactly 20%…"). Red is reserved for breaches matched on the agent's actual words (a discount, a rate
+other than 20%); anything the AI only suspects shows as an amber warning. The scorecard notes it too
+(a slip corrected on the same call costs little).
+
+## "Call going badly" assist
+
+If the customer gets frustrated or impatient (the sentiment gauges), a general assist appears:
+"Customer is frustrated" (acknowledge first, then ask) or "Losing the customer: slow down". It isn't
+a guardrail, and it shows at most every 45s. To see it, play the customer annoyed for two lines
+("Yeh sab bakwaas hai, pichli baar bhi paisa doob gaya tha").
 
 ## Before you rehearse
 
