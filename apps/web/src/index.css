@@ -184,10 +184,71 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: -32px 0 var(--foreground), -64px -32px var(--foreground), -32px -64px var(--foreground), -96px 32px var(--foreground);
 }
 
+.brand-hero-intro {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "wordmark" "crowd" "heading" "description" "action";
+  gap: 24px;
+  margin-bottom: 64px;
+  align-items: center;
+}
+
+.brand-wordmark {
+  grid-area: wordmark;
+}
+
+.brand-hero-heading {
+  grid-area: heading;
+}
+
+.brand-hero-description {
+  grid-area: description;
+}
+
+.brand-hero-action {
+  grid-area: action;
+}
+
 .brand-hero .crowd-backdrop {
-  position: absolute;
-  inset: 0;
-  visibility: hidden;
+  grid-area: crowd;
+  position: relative;
+  height: 240px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--card);
+  pointer-events: none;
+}
+
+.brand-hero .crowd-backdrop canvas {
+  left: 0;
+  width: 150%;
+  height: 150%;
+  max-width: none;
+  transform: scale(0.6666667);
+  transform-origin: bottom left;
+}
+
+.brand-hero.brand-mosaic::before {
+  top: -32px;
+}
+
+@media (min-width: 1024px) {
+  .brand-hero-intro {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    grid-template-areas:
+      "wordmark crowd"
+      "heading crowd"
+      "description crowd"
+      "action crowd";
+    column-gap: 48px;
+  }
+
+  .brand-hero .crowd-backdrop {
+    align-self: stretch;
+    height: auto;
+    min-height: 360px;
+  }
 }
 
 .brand-wordmark canvas {

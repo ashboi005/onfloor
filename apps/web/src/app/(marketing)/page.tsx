@@ -13,44 +13,47 @@ export default function Landing() {
         <ModeToggle />
       </div>
       {/* 1. Hero Section */}
-      <section className="brand-hero brand-mosaic relative mx-auto flex w-full flex-col items-center overflow-hidden border-b px-6 py-16 text-center md:py-20">
-        <div className="crowd-backdrop"><CrowdCanvas src="https://cdn.21st.dev/assets/localized/abdb8990a7bef8c2f5af3e45f0a3c969c4b0603fba8be92e81347de4ea4e1ed7.png" rows={15} cols={7} /></div>
-        
+      <section className="brand-hero brand-mosaic relative mx-auto flex w-full flex-col items-center overflow-hidden border-b px-6 py-10 text-center md:py-12">
         <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center">
-          <div className="brand-wordmark relative mb-2 h-[200px] w-full md:h-[280px]">
-            <TechText
-              text="OnFloor"
-              fontWeight={800}
-              fontSize={110}
-              reveal="letter"
-              dashLength={4}
-              dashGap={2}
-              specks={15}
-              fontFamily=""
-              color="#193bf2"
-              accentColor="#193bf2"
-              letterSpacing={-0.05}
-              reach={200}
-              softness={0.7}
-              strokeWidth={1.5}
-              speed={1}
-              lineStyle="dashed"
-              selection
-              labels
-              draggable
-              sweep
-            />
-          </div>
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl mb-6 drop-shadow-sm">
-            Risk-free training. <span className="text-info">Win the call.</span>
-          </h2>
-          <p className="mb-10 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-            Train agents against adversarial AI customers, coach them live during real calls, and get an instant QA score the moment they hang up.
-          </p>
-          <div className="mb-16 flex justify-center">
-            <Link href="/simulator" className="inline-flex h-12 items-center justify-center rounded-xl bg-primary px-8 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/15 transition-colors hover:bg-card">
-              Try simulation <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
+          <div className="brand-hero-intro">
+            <div className="brand-wordmark relative h-[140px] w-full md:h-[180px]">
+              <TechText
+                text="OnFloor"
+                fontWeight={800}
+                fontSize={110}
+                reveal="letter"
+                dashLength={4}
+                dashGap={2}
+                specks={15}
+                fontFamily=""
+                color="#193bf2"
+                accentColor="#193bf2"
+                letterSpacing={-0.05}
+                reach={200}
+                softness={0.7}
+                strokeWidth={1.5}
+                speed={1}
+                lineStyle="dashed"
+                selection
+                labels
+                draggable
+                sweep
+              />
+            </div>
+            <div className="crowd-backdrop" aria-hidden="true">
+              <CrowdCanvas src="https://cdn.21st.dev/assets/localized/abdb8990a7bef8c2f5af3e45f0a3c969c4b0603fba8be92e81347de4ea4e1ed7.png" rows={15} cols={7} />
+            </div>
+            <h2 className="brand-hero-heading text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+              Risk-free training. <span className="text-info">Win the call.</span>
+            </h2>
+            <p className="brand-hero-description mx-auto max-w-2xl text-lg leading-relaxed text-muted-foreground">
+              Train agents against adversarial AI customers, coach them live during real calls, and get an instant QA score the moment they hang up.
+            </p>
+            <div className="brand-hero-action flex justify-center">
+              <Link href="/simulator" className="inline-flex h-12 items-center justify-center rounded-xl bg-primary px-8 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/15 transition-colors hover:bg-card">
+                Try simulation <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </div>
           </div>
           {/* Product visual: the live copilot HUD, self-playing */}
           <HudDemo />
