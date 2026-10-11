@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, PlayCircle, Bot, Zap, Activity, Globe, Server, AudioLines, Send } from "lucide-react";
+import { ArrowRight, Bot, Zap, Activity, Globe, Server, AudioLines, Send } from "lucide-react";
 import { CrowdCanvas } from "@/components/crowd-canvas";
 import TechText from "@/components/tech-text";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -47,13 +47,10 @@ export default function Landing() {
           <p className="text-xl text-muted-foreground max-w-2xl mb-10 bg-background/40 backdrop-blur-sm p-4 rounded-xl border border-border/50">
             Train agents against adversarial AI customers, coach them live during real calls, and get an instant QA score the moment they hang up.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 mb-16">
+          <div className="mb-16 flex justify-center">
             <Link href="/simulator" className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
-              Try the simulator <ArrowRight className="ml-2 h-4 w-4" />
+              Try simulation <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
-            <button className="inline-flex h-12 items-center justify-center rounded-md border border-input bg-background/80 backdrop-blur-md px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
-              <PlayCircle className="mr-2 h-4 w-4" /> Watch the demo
-            </button>
           </div>
           {/* Product visual: the live copilot HUD, self-playing */}
           <HudDemo />
