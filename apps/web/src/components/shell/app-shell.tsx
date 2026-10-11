@@ -31,7 +31,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="flex flex-col border-r bg-muted/10 shadow-sm">
         <div className="flex h-16 items-center border-b px-6">
           <Link href="/" className="flex items-center gap-2 font-bold tracking-tight hover:opacity-80 transition-opacity">
-            <img src="/icon.png" alt="OnFloor Logo" className="h-8 w-8 object-contain drop-shadow-sm" />
+            <img src="/icon.png" alt="OnFloor Logo" className="h-8 w-8 rounded-lg object-contain drop-shadow-sm" />
             <span className="text-xl">OnFloor</span>
           </Link>
         </div>
