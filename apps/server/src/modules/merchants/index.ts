@@ -70,19 +70,25 @@ function seeded(key: string) {
  * A live-call persona has an identity but no restaurant data. On replay we derive a stable
  * merchant profile from it (persisted, so its UID resolves in Merchant Dashboard).
  */
+/** Round, small DRRs (₹100-500) so the 20%-of-incremental maths is easy to say on the call. */
+const REPLAY_DRRS = [100, 150, 200, 250, 300, 400, 500];
+const MAX_DRR = 1000;
+
 export async function ensureMerchantForPersona(persona: Persona): Promise<Merchant> {
   const id = `mer_live_${persona.id}`;
   const existing = await db.select().from(merchants).where(eq(merchants.id, id));
-  if (existing[0]) return toMerchant(existing[0]);
+  const current = existing[0] ? toMerchant(existing[0]) : null;
+  // Profiles derived before DRRs were capped (₹3,000-25,000) are rebuilt with the same UID.
+  if (current && current.drr <= MAX_DRR) return current;
 
   const rand = seeded(persona.id);
   const first = persona.name.split(/\s+/)[0] ?? persona.name;
   const restaurantName = persona.role.split(",").slice(1).join(",").trim() || `${first}'s Kitchen`;
   const slug = restaurantName.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  const drr = rand(30, 250) * 100;
-  const aov = rand(20, 45) * 10;
-  let uid = String(rand(10_000_000, 99_999_999));
-  while (await findMerchantByUid(uid)) uid = String(rand(10_000_000, 99_999_999));
+  const drr = REPLAY_DRRS[rand(0, REPLAY_DRRS.length - 1)]!;
+  const aov = Math.min(drr, rand(10, 30) * 10);
+  let uid = current?.uid ?? String(rand(10_000_000, 99_999_999));
+  while (!current && (await findMerchantByUid(uid))) uid = String(rand(10_000_000, 99_999_999));
   const items = persona.business.type.includes("cafe") ? ["Cold Coffee", "Club Sandwich", "Brownie"] : ["House Special Thali", "Paneer Butter Masala", "Masala Chai"];
 
   return upsertMerchant({
@@ -104,7 +110,7 @@ export async function ensureMerchantForPersona(persona: Persona): Promise<Mercha
     drr,
     avgOrderValue: aov,
     ordersPerDay: Math.max(1, Math.round(drr / aov)),
-    topItems: items.map((name, i) => ({ name, price: rand(8, 30) * 10, dailySales: Math.round((drr * [0.35, 0.2, 0.1][i]!) / 10) * 10 })),
+    topItems: items.map((name, i) => ({ name, price: rand(8, 30) * 10, dailySales: Math.round((drr * [0.5, 0.3, 0.2][i]!) / 10) * 10 })),
     menu: { items: rand(25, 60), itemsWithPhotos: rand(5, 20) },
     orderRejectionPct: rand(15, 90) / 10,
     payoutCycle: "weekly",
