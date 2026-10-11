@@ -119,13 +119,15 @@ export function onFinal(callId: string, turn: TranscriptTurn) {
     state.fired = new Set();
     void services.llm.json({ job: "copilot", tier: "fast", schemaName: "live_agent_guardrails", schema: agentAnalysis,
       timeoutMs: 12_000, maxTokens: 400, temperature: 0,
-      messages: [{ role: "system", content: `${system}\nFind actual violations in the latest AGENT turn only. Be conservative: report a violation only when the agent's own words clearly state something the policies forbid (e.g. a commission other than 20%, a discount, a guarantee of orders). Correct statements of the plan, refusals, the agent repeating or correcting what the customer said, quotes, conditional offers subject to approval, and approval requests are NOT violations. Never report something that wasn't said. For each alert give quote = the exact words from the latest agent turn that break the policy. Return alerts (empty if none, which is the usual case).` },
+      messages: [{ role: "system", content: `${system}\nFind actual violations in the latest AGENT turn only. Be conservative: report a violation only when the agent's own words clearly state something the policies forbid (e.g. a commission other than 20%, a discount, a guarantee of orders). Correct statements of the plan, refusals, the agent repeating or correcting what the customer said, quotes, conditional offers subject to approval, and approval requests are NOT violations. Never report something that wasn't said, and never report an omission (something the agent didn't say, said vaguely, or hasn't said yet): only a wrong or forbidden statement counts. For each alert give quote = the exact words from the latest agent turn that break the policy. Return alerts (empty if none, which is the usual case).` },
         { role: "user", content: context }],
     }).then((result) => {
       if (!state.active) return;
       const said = turn.text.toLowerCase();
       for (const violation of result.alerts) {
         if (!violation.quote.trim() || !said.includes(violation.quote.trim().toLowerCase())) continue; // not actually said
+        // [added by Ashwath] Omissions ("failed to state", "didn't mention") are coaching, not violations.
+        if (/\b(?:fail(?:ed|s)? to|did(?:n't| not)|does(?:n't| not)|not (?:clearly )?(?:state|mention|say)|without (?:stating|mentioning)|omit|vague|unclear)\b/i.test(violation.message)) continue;
         alert(callId, violation.policyId, violation.message, turn.id, fired, "model");
       }
     }).catch((error) => console.warn("[live] agent policy analysis failed", error instanceof Error ? error.name : "unknown"));
