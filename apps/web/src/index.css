@@ -1,1 +1,36 @@
 @import "@onfloor/ui/globals.css";
+
+.interactive-card {
+  border-radius: 1rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.interactive-card:is(:hover, :focus-visible),
+.interactive-card-trigger:focus-visible > .interactive-card {
+  border-color: var(--foreground);
+  background-color: var(--foreground);
+  color: var(--background);
+}
+
+.interactive-card:is(:hover, :focus-visible) *,
+.interactive-card-trigger:focus-visible > .interactive-card * {
+  color: var(--background) !important;
+}
+
+.interactive-card:is(:hover, :focus-visible) .interactive-card-chip,
+.interactive-card-trigger:focus-visible > .interactive-card .interactive-card-chip {
+  background-color: var(--background);
+  color: var(--foreground) !important;
+}
+
+.interactive-card:focus-visible,
+.interactive-card-trigger:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}

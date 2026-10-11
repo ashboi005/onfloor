@@ -94,8 +94,8 @@ export default function SimulatorPicker() {
           {merchantList.map((m) => {
             const selected = pick?.kind === "merchant" && pick.merchant.id === m.id;
             return (
-              <button key={m.id} type="button" onClick={() => choose({ kind: "merchant", merchant: m })} aria-pressed={selected} className="text-left">
-                <Card className={`h-full transition ${selected ? "border-primary ring-1 ring-primary/50" : "hover:border-primary/40"}`}>
+              <button key={m.id} type="button" onClick={() => choose({ kind: "merchant", merchant: m })} aria-pressed={selected} className="interactive-card-trigger text-left">
+                <Card className={`interactive-card h-full ${selected ? "border-primary ring-1 ring-primary/50" : ""}`}>
                   <CardHeader className="p-4">
                     <CardTitle className="text-base">{m.restaurantName}</CardTitle>
                     <CardDescription>{m.ownerName} · {m.locality}, {m.city}</CardDescription>
@@ -112,13 +112,13 @@ export default function SimulatorPicker() {
         </div>
         {liveCustomers.length > 0 && (
           <>
-            <p className="flex items-center gap-2 pt-2 text-xs font-semibold uppercase tracking-wider text-emerald-300"><Radio className="size-3.5" /> From live calls (replay the real customer)</p>
+            <p className="flex items-center gap-2 pt-2 text-xs font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-300"><Radio className="size-3.5" /> From live calls (replay the real customer)</p>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {liveCustomers.map((p) => {
                 const selected = pick?.kind === "live" && pick.persona.id === p.id;
                 return (
-                  <button key={p.id} type="button" onClick={() => choose({ kind: "live", persona: p })} aria-pressed={selected} className="text-left">
-                    <Card className={`h-full transition ${selected ? "border-emerald-400 ring-1 ring-emerald-400/50" : "hover:border-emerald-400/40"}`}>
+                  <button key={p.id} type="button" onClick={() => choose({ kind: "live", persona: p })} aria-pressed={selected} className="interactive-card-trigger text-left">
+                    <Card className={`interactive-card h-full ${selected ? "border-emerald-400 ring-1 ring-emerald-400/50" : ""}`}>
                       <CardHeader className="p-4"><CardTitle className="text-base">{p.name}</CardTitle><CardDescription>{p.role}</CardDescription></CardHeader>
                       <CardContent className="p-4 pt-0 text-xs text-muted-foreground">{ARCHETYPE_LABELS[p.archetype]} · “{p.openingLine}”</CardContent>
                     </Card>
@@ -142,8 +142,8 @@ export default function SimulatorPicker() {
                 {presets.map((p) => {
                   const selected = preset?.id === p.id;
                   return (
-                    <button key={p.id} type="button" onClick={() => { setPersonaId(p.id); setTraits(null); }} aria-pressed={selected} className="text-left">
-                      <Card className={`h-full transition ${selected ? "border-primary ring-1 ring-primary/50" : "hover:border-primary/40"}`}>
+                    <button key={p.id} type="button" onClick={() => { setPersonaId(p.id); setTraits(null); }} aria-pressed={selected} className="interactive-card-trigger text-left">
+                      <Card className={`interactive-card h-full ${selected ? "border-primary ring-1 ring-primary/50" : ""}`}>
                         <CardHeader className="p-4"><CardTitle className="text-sm">{p.name}{p.id === pick.merchant.defaultPersonaId ? " · suggested" : ""}</CardTitle><CardDescription className="line-clamp-3 text-xs">{p.backstory}</CardDescription></CardHeader>
                       </Card>
                     </button>
@@ -158,7 +158,7 @@ export default function SimulatorPicker() {
                       const value = (traits ?? preset.traits)[k];
                       return (
                         <label key={k} className="block text-xs">
-                          <span className="flex justify-between"><span>{k.replace(/([A-Z])/g, " $1")}</span><span className="font-mono">{value}/10</span></span>
+                          <span className="flex justify-between"><span>{k.replace(/([A-Z])/g, " $1").replace(/^\w/, (letter) => letter.toUpperCase())}</span><span className="font-mono">{value}/10</span></span>
                           <input type="range" min={0} max={10} value={value} className="w-full" onChange={(e) => setTraits({ ...(traits ?? preset.traits), [k]: Number(e.target.value) })} />
                         </label>
                       );

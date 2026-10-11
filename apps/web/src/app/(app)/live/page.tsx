@@ -49,7 +49,7 @@ export default function LiveHud() {
         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-300">OnFloor line is ready</p>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">Waiting for a call</h1>
         <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">Keep this window open. The HUD will attach automatically when a customer calls the OnFloor line.</p>
-        {!USE_MOCKS && <Button type="button" className="mt-6" onClick={() => simulate.mutate()} disabled={simulate.isPending}><Radio className="size-4" />{simulate.isPending ? "Starting call…" : "Simulate a call (dev)"}</Button>}
+        {!USE_MOCKS && <Button type="button" size="lg" className="mt-6 rounded-lg px-4 text-sm" onClick={() => simulate.mutate()} disabled={simulate.isPending}><Radio className="size-4" />{simulate.isPending ? "Starting call…" : "Simulate a call"}</Button>}
         {simulate.error && <p className="mt-4 text-xs text-red-300">{simulate.error.message}</p>}
         {live.error && <div className="mt-5 flex items-center gap-2 text-xs text-red-300"><RotateCcw className="size-3.5" /> {live.error}</div>}
       </div>

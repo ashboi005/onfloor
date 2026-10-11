@@ -37,7 +37,7 @@ export default function ScorecardPage() {
     <div className="mx-auto max-w-4xl space-y-8 p-8">
       <header>
         <div className="text-sm text-muted-foreground">
-          {c.kind} · {c.customerLabel} · {fmt(sc.stats.durationMs)}
+          {c.kind.replace(/^\w/, (letter) => letter.toUpperCase())} · {c.customerLabel} · {fmt(sc.stats.durationMs)}
         </div>
         <h1 className="text-4xl font-semibold">
           {sc.overall} <span className="text-2xl">{sc.grade}</span>

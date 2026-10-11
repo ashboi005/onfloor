@@ -8,6 +8,8 @@ import { useState } from "react";
 
 import { useCalls } from "@/lib/api";
 
+const titleCase = (value: string) => value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+
 export default function CallsPage() {
   const [kind, setKind] = useState<CallKind | undefined>();
   const calls = useCalls(kind);
@@ -23,29 +25,27 @@ export default function CallsPage() {
             onClick={() => setKind(k)}
             className={`rounded-md border px-3 py-1 ${kind === k ? "bg-muted" : ""}`}
           >
-            {k ?? "all"}
+            {k ? titleCase(k) : "All"}
           </button>
         ))}
       </div>
       {calls.isPending && <p>Loading…</p>}
-      <table className="w-full text-sm">
-        <tbody>
-          {calls.data?.map((c) => (
-            <tr key={c.id} className="border-b">
-              <td className="py-2">
-                <Link className="underline" href={`/calls/${c.id}` as Route}>
-                  {c.customerLabel}
-                </Link>
-              </td>
-              <td>{c.kind}</td>
-              <td>{c.status}</td>
-              <td>{c.overallScore ?? "–"}</td>
-              <td>{c.durationMs ? `${Math.round(c.durationMs / 1000)}s` : "–"}</td>
-              <td className="text-muted-foreground">{new Date(c.startedAt).toLocaleString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="space-y-2 text-sm">
+        {calls.data?.map((c) => (
+          <Link
+            key={c.id}
+            className="interactive-card flex flex-wrap items-center gap-x-5 gap-y-2 border px-4 py-3 no-underline sm:flex-nowrap"
+            href={`/calls/${c.id}` as Route}
+          >
+            <span className="min-w-48 flex-1 font-medium">{c.customerLabel}</span>
+            <span>{titleCase(c.kind)}</span>
+            <span>{titleCase(c.status)}</span>
+            <span>{c.overallScore ?? "–"}</span>
+            <span>{c.durationMs ? `${Math.round(c.durationMs / 1000)}s` : "–"}</span>
+            <span className="text-muted-foreground">{new Date(c.startedAt).toLocaleString()}</span>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
