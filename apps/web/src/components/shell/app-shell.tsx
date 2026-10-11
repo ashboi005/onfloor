@@ -7,7 +7,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, Activity, Phone, Users, PhoneCall } from "lucide-react";
+import { Bot, Activity, Phone, Users } from "lucide-react";
 
 import { ModeToggle } from "@/components/mode-toggle";
 import UserMenu from "@/components/user-menu";
@@ -27,17 +27,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (isFullBleed(pathname)) return <div className="h-svh overflow-hidden">{children}</div>;
 
   return (
-    <div className="grid h-svh grid-cols-[260px_1fr] bg-background text-foreground">
-      <aside className="flex flex-col border-r bg-muted/10 shadow-sm">
-        <div className="flex h-16 items-center border-b px-6">
+    <div className="grid h-svh grid-cols-[72px_minmax(0,1fr)] bg-background text-foreground md:grid-cols-[224px_minmax(0,1fr)]">
+      <aside className="flex min-w-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+        <div className="flex h-20 items-center justify-center border-b border-sidebar-border px-3 md:justify-start md:px-5">
           <Link href="/" className="flex items-center gap-2 font-bold tracking-tight hover:opacity-80 transition-opacity">
-            <img src="/icon.png" alt="OnFloor Logo" className="h-8 w-8 rounded-lg object-contain drop-shadow-sm" />
-            <span className="text-xl">OnFloor</span>
+            <img src="/icon.png" alt="OnFloor Logo" className="h-10 w-10 rounded-xl border border-border bg-white p-1 object-contain" />
+            <span className="hidden text-xl md:inline">OnFloor</span>
           </Link>
         </div>
         
-        <nav className="flex-1 space-y-1 p-4">
-          <div className="mb-4 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <nav className="flex-1 space-y-2 p-3 md:p-4">
+          <div className="mb-5 hidden px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground md:block">
             Menu
           </div>
           {NAV.map(({ href, label, icon }) => {
@@ -46,26 +46,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                aria-current={isActive ? "page" : undefined}
+                title={label}
+                className={`flex items-center justify-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors md:justify-start ${
                   isActive
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm shadow-primary/20"
+                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 }`}
               >
                 {icon}
-                {label}
+                <span className="hidden md:inline">{label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="mt-auto border-t bg-muted/30 p-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex-1 truncate">
+        <div className="mt-auto border-t border-sidebar-border bg-card p-3 md:p-4">
+          <div className="flex flex-col items-center justify-between gap-3 md:flex-row">
+            <div className="min-w-0 max-w-full truncate md:flex-1">
               {USE_MOCKS ? (
-                <div className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-amber-500/20 bg-amber-500/10 text-xs font-medium text-amber-500">
-                  <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                  MOCK DATA
+                <div aria-label="Mock data" className="flex items-center justify-center gap-2 rounded-lg border border-primary bg-card px-3 py-2 text-[10px] font-semibold tracking-wide text-info md:justify-start">
+                  <div className="h-1.5 w-1.5 rounded-sm bg-primary" />
+                  <span className="hidden md:inline">MOCK DATA</span>
                 </div>
               ) : (
                 <UserMenu />
@@ -75,13 +77,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </aside>
-      <main className="flex flex-col overflow-hidden relative">
-        <header className="flex h-16 items-center justify-between border-b px-8 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
-          <h1 className="text-xl font-semibold tracking-tight">
+      <main className="relative flex min-w-0 flex-col overflow-hidden">
+        <header className="workspace-header pixel-accent sticky top-0 z-10 flex h-20 shrink-0 items-center justify-between border-b bg-card px-5 md:px-8">
+          <h1 className="text-lg font-semibold tracking-tight">
             {NAV.find(n => pathname.startsWith(n.href))?.label || "Dashboard"}
           </h1>
         </header>
-        <div className="flex-1 overflow-y-auto p-8">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </main>
     </div>
   );

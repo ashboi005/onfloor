@@ -15,15 +15,16 @@ export default function CallsPage() {
   const calls = useCalls(kind);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 p-8">
-      <h1 className="text-2xl font-semibold">Calls</h1>
+    <div className="mx-auto max-w-7xl space-y-6 p-5 sm:p-8">
+      <h1 className="pixel-accent py-2 text-3xl font-semibold tracking-tight">Calls</h1>
       <div className="flex gap-2 text-sm">
         {([undefined, "sim", "live"] as const).map((k) => (
           <button
             type="button"
             key={k ?? "all"}
             onClick={() => setKind(k)}
-            className={`rounded-md border px-3 py-1 ${kind === k ? "bg-muted" : ""}`}
+            aria-pressed={kind === k}
+            className={`rounded-lg border px-4 py-2 font-medium transition-colors ${kind === k ? "border-primary bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
           >
             {k ? titleCase(k) : "All"}
           </button>
@@ -34,13 +35,13 @@ export default function CallsPage() {
         {calls.data?.map((c) => (
           <Link
             key={c.id}
-            className="interactive-card flex flex-wrap items-center gap-x-5 gap-y-2 border px-4 py-3 no-underline sm:flex-nowrap"
+            className="interactive-card grid grid-cols-2 items-center gap-3 border px-5 py-4 no-underline lg:grid-cols-[minmax(0,1fr)_3rem_6rem_3rem_4rem_11rem]"
             href={`/calls/${c.id}` as Route}
           >
-            <span className="min-w-48 flex-1 font-medium">{c.customerLabel}</span>
-            <span>{titleCase(c.kind)}</span>
+            <span className="col-span-2 font-semibold lg:col-span-1">{c.customerLabel}</span>
+            <span className="text-info">{titleCase(c.kind)}</span>
             <span>{titleCase(c.status)}</span>
-            <span>{c.overallScore ?? "–"}</span>
+            <span className="text-lg font-semibold tabular-nums text-info">{c.overallScore ?? "–"}</span>
             <span>{c.durationMs ? `${Math.round(c.durationMs / 1000)}s` : "–"}</span>
             <span className="text-muted-foreground">{new Date(c.startedAt).toLocaleString()}</span>
           </Link>

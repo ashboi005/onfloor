@@ -42,8 +42,8 @@ export function ReplayLoop() {
       <svg viewBox="0 0 100 100" className="absolute inset-0 size-full overflow-visible" aria-hidden="true">
         <defs>
           <linearGradient id="loop-grad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="rgb(37 99 235)" />
-            <stop offset="100%" stopColor="rgb(13 148 136)" />
+            <stop offset="0%" stopColor="var(--foreground)" />
+            <stop offset="100%" stopColor="var(--foreground)" />
           </linearGradient>
         </defs>
         <circle cx="50" cy="50" r={R} fill="none" className="stroke-border" strokeWidth="0.6" strokeDasharray="1.2 1.6" />
@@ -62,7 +62,7 @@ export function ReplayLoop() {
         />
         {!still && (
           <>
-            <circle cx={dot.x} cy={dot.y} r="2.4" fill="rgb(13 148 136)" opacity="0.25" />
+            <rect x={dot.x - 2} y={dot.y - 2} width="4" height="4" fill="var(--foreground)" />
             <circle cx={dot.x} cy={dot.y} r="1.3" fill="url(#loop-grad)" />
           </>
         )}
@@ -72,7 +72,7 @@ export function ReplayLoop() {
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="max-w-[7.5rem] text-center sm:max-w-[9rem]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Every call</p>
-          <p className="mt-1 bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-base font-bold leading-tight sm:text-lg text-transparent dark:from-blue-500 dark:to-teal-400">becomes practice</p>
+          <p className="mt-1 text-base font-bold leading-tight text-info sm:text-lg">becomes practice</p>
           <p className="mt-2 text-[10px] text-muted-foreground">scored · replayed · scored again</p>
         </div>
       </div>
@@ -85,7 +85,7 @@ export function ReplayLoop() {
           <div key={title} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${p.x}%`, top: `${p.y}%` }}>
             <div
               className={`flex size-11 items-center justify-center rounded-full border-2 bg-card shadow-sm transition-all duration-500 sm:size-12 ${
-                on ? "scale-110 border-teal-500 text-teal-600 shadow-[0_0_24px_rgba(20,184,166,0.35)] dark:text-teal-300" : "border-border text-muted-foreground"
+                on ? "scale-110 border-primary text-info shadow-md shadow-primary/15" : "border-border text-muted-foreground"
               }`}
             >
               <Icon className="size-5" />

@@ -30,16 +30,16 @@ export function SimWorkspace({ start, call }: { start: SimSessionStart; call: Si
     <div className="flex h-full min-h-0 flex-col">
       {start.guidance && <GuidanceBar guidance={call.guidance} />}
       <div className="grid min-h-0 flex-1 md:grid-cols-[280px_1fr]">
-        <aside className="min-h-0 border-b border-border/70 md:border-b-0 md:border-r"><Nugget start={start} call={call} /></aside>
+        <aside className="min-h-0 border-b border-border md:border-b-0 md:border-r"><Nugget start={start} call={call} /></aside>
         <section className="flex min-h-0 flex-col">
-          <div className="flex shrink-0 gap-1 border-b border-border/70 bg-muted/30 px-2 pt-2">
+          <div className="flex shrink-0 gap-1 border-b border-border bg-card px-2 pt-2">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 data-guide={`tab.${t.id}`}
                 onClick={() => open(t.id)}
-                className={`rounded-t-md border border-b-0 px-3 py-1.5 text-xs ${tab === t.id ? "border-border bg-background font-semibold" : "border-transparent text-muted-foreground hover:bg-background/60"}`}
+                className={`rounded-t-lg border border-b-0 px-4 py-2 text-xs transition-colors ${tab === t.id ? "border-border bg-card font-semibold text-info" : "border-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
               >
                 {t.label}
               </button>

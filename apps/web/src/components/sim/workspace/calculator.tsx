@@ -12,7 +12,7 @@ export function MaxGrowCalculator({ drr }: { drr: number }) {
   const [sales, setSales] = useState(Math.round((drr * 2) / step) * step);
   const bill = maxGrowBill({ drr, avgDailySales: sales });
   return (
-    <div data-guide="calculator" className="space-y-3 border border-border/70 bg-card/60 p-4 text-sm">
+    <div data-guide="calculator" className="space-y-3 rounded-xl border border-border bg-card p-4 text-sm">
       <div className="flex items-baseline justify-between">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Max Grow calculator</p>
         <p className="text-[10px] text-muted-foreground">{MAX_GROW.commissionPct}% on incremental only</p>
@@ -35,7 +35,7 @@ export function MaxGrowCalculator({ drr }: { drr: number }) {
         <div><dt className="text-muted-foreground">Commission (20%)</dt><dd className="font-mono">{rupees(bill.commissionPerDay)}/day · {rupees(bill.commissionForPeriod)}/week</dd></div>
         <div><dt className="text-muted-foreground">Merchant keeps</dt><dd className="font-mono">{rupees(bill.merchantGainPerDay)}/day extra</dd></div>
       </dl>
-      <p className={`text-xs ${bill.noDeduction ? "text-emerald-300" : "text-muted-foreground"}`}>
+      <p className={`text-xs ${bill.noDeduction ? "text-success" : "text-muted-foreground"}`}>
         {bill.noDeduction
           ? `At or below ${rupees(drr)}/day: zero deduction.`
           : `Say it: "20% only on the extra ${rupees(bill.incrementalPerDay)} a day, so ${rupees(bill.commissionPerDay)}. Nothing if sales stay at ${rupees(drr)}."`}{" "}

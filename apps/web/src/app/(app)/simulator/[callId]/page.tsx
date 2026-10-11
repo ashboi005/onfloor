@@ -53,12 +53,12 @@ function SimWorkspace({ start }: { start: SimSessionStart }) {
   const label = { dialing: "Dialling", ringing: "Ringing", connected: "Live practice", wrap_up: "Wrap-up: dispose in Nugget", done: "Done" }[call.phase];
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-border/70 bg-card/80 px-4 py-3 backdrop-blur sm:px-6">
-        <div className="flex min-w-0 items-center gap-3"><div className="flex size-8 items-center justify-center bg-primary/10 text-primary"><Headphones className="size-4" /></div><div className="min-w-0"><p className="truncate text-sm font-semibold">{start.scenario.title}</p><p className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground"><Radio className="size-3 text-emerald-300" /> {label}{start.guidance ? " · guidance on" : ""}</p></div></div>
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-border bg-card px-4 py-3 backdrop-blur sm:px-6">
+        <div className="flex min-w-0 items-center gap-3"><div className="flex size-8 items-center justify-center bg-card text-info"><Headphones className="size-4" /></div><div className="min-w-0"><p className="truncate text-sm font-semibold">{start.scenario.title}</p><p className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground"><Radio className="size-3 text-success" /> {label}{start.guidance ? " · guidance on" : ""}</p></div></div>
         <Button type="button" size="sm" variant="ghost" onClick={() => router.push("/simulator" as Route)} disabled={call.phase === "connected" || call.phase === "wrap_up"}><ArrowLeft className="size-3.5" /> Exit workspace</Button>
       </header>
       <main className="grid min-h-0 flex-1 lg:grid-cols-[3fr_2fr]">
-        <section className="min-h-0 overflow-hidden border-b border-border/70 lg:border-b-0 lg:border-r"><Tools start={start} call={call} /></section>
+        <section className="min-h-0 overflow-hidden border-b border-border lg:border-b-0 lg:border-r"><Tools start={start} call={call} /></section>
         <section className="min-h-0 overflow-hidden"><CallTerminal persona={onLine} call={call} onEnd={endCall} onScorecard={() => router.push(`/calls/${callId}` as Route)} onRetry={() => window.location.reload()} /></section>
       </main>
     </div>

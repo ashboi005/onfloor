@@ -18,8 +18,9 @@ export function useGuideHighlight(target: GuidanceTarget | null | undefined) {
 }
 
 export const GUIDE_CSS = `
-.guide-highlight { position: relative; outline: 2px solid rgb(250 204 21); outline-offset: 3px; border-radius: 4px; animation: guide-pulse 1.4s ease-in-out infinite; }
-@keyframes guide-pulse { 0%, 100% { outline-color: rgb(250 204 21 / 0.95); } 50% { outline-color: rgb(250 204 21 / 0.35); } }
+.guide-highlight { position: relative; outline: 2px dashed var(--ring); outline-offset: 3px; border-radius: 0; animation: guide-pulse 1.4s steps(1, end) infinite; }
+@keyframes guide-pulse { 0%, 100% { outline-style: dashed; } 50% { outline-style: solid; } }
+@media (prefers-reduced-motion: reduce) { .guide-highlight { animation: none; } }
 `;
 
 const TIP_ICON = { answer: MessageSquareQuote, objection: MessageSquareQuote, warning: TriangleAlert, info: Lightbulb } as const;
@@ -30,13 +31,13 @@ export function GuidanceBar({ guidance }: { guidance: GuidanceState | null }) {
   if (!guidance) return null;
   const done = guidance.steps.filter((s) => s.status !== "todo").length;
   return (
-    <div className="space-y-2 border-b border-border/70 bg-amber-300/[0.06] px-4 py-3">
+    <div className="space-y-2 border-b border-border bg-card px-4 py-3">
       <style>{GUIDE_CSS}</style>
       {guidance.next && (
         <div className="flex items-start gap-2 text-sm">
-          <ListChecks className="mt-0.5 size-4 shrink-0 text-amber-300" />
+          <ListChecks className="mt-0.5 size-4 shrink-0 text-info" />
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-info">
               Next · step {Math.min(done + 1, guidance.steps.length)} of {guidance.steps.length}
             </p>
             <p className="leading-snug">{guidance.next.text}</p>
@@ -46,8 +47,8 @@ export function GuidanceBar({ guidance }: { guidance: GuidanceState | null }) {
       {guidance.tips.map((tip) => {
         const Icon = TIP_ICON[tip.kind];
         return (
-          <div key={tip.id} className={`flex items-start gap-2 border px-3 py-2 text-xs ${tip.kind === "warning" ? "border-red-400/30 bg-red-400/10" : "border-border/60 bg-background/40"}`}>
-            <Icon className="mt-0.5 size-3.5 shrink-0 text-amber-200" />
+          <div key={tip.id} className={`flex items-start gap-2 border px-3 py-2 text-xs ${tip.kind === "warning" ? "border-destructive bg-card" : "border-border bg-card"}`}>
+            <Icon className="mt-0.5 size-3.5 shrink-0 text-warning" />
             <span>{tip.text}</span>
           </div>
         );
