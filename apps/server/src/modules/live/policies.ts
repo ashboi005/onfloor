@@ -22,6 +22,9 @@ export const LIVE_POLICIES: Policy[] = [
     goldenLine: "I'll ask our support team to review refund eligibility and confirm the outcome." },
 ];
 
+/** The agent offering a discount / waiver / lower rate, with or without a number. */
+const DISCOUNT_OFFER = /(?:\b(?:discount|waiver|waive|chhoot|chhut|concession)\b|छूट|डिस्काउंट|रियायत).{0,25}(?:\b(?:de (?:deta|dunga|denge|sakta|doonga)|de dete|dunga|doonga|denge|kar deta|kar dunga|kar denge|give|offer|can do|i'?ll do)\b|दे देता|दूंगा|देंगे|कर देता|कर दूंगा)|(?:\b(?:give|offer|de deta|de dunga|kar deta|kar dunga)\b|दे देता|दूंगा|देंगे).{0,25}(?:\bdiscount\b|छूट|डिस्काउंट)|\b(?:kam kar (?:deta|dunga|denge)|lower (?:it|the rate|the commission) (?:for you|to))\b/i;
+
 /** "20% on the extra sales" is the correct rate, never a discount. */
 const COMMISSION_CONTEXT = /commission|incremental|extra|growth|baseline|drr|कमीशन|एक्स्ट्रा/i;
 
@@ -36,6 +39,8 @@ export function detectViolations(text: string): Policy[] {
     const rateIsTheCommission = (n: number) => n === 20 && COMMISSION_CONTEXT.test(clause);
     if (discounted && ([...clause.matchAll(/\b(\d+(?:\.\d+)?)\s*(?:%|percent|pratishat|प्रतिशत|परसेंट)/gi)].some((m) => Number(m[1]) > 10 && !rateIsTheCommission(Number(m[1]))) ||
       /\b(?:eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|pandrah|bees)\s*(?:percent|pratishat)|(?:पंद्रह|बीस|तीस)\s*(?:प्रतिशत|परसेंट)/i.test(clause))) ids.add("pol_discount");
+    // [added by Ashwath] Offering a discount at all, number or not ("main aapko discount de deta hoon").
+    if (DISCOUNT_OFFER.test(clause)) ids.add("pol_discount");
     for (const rule of FAST_PATHS) if (rule.policyId !== "pol_discount" && rule.pattern.test(clause)) ids.add(rule.policyId);
   }
   return LIVE_POLICIES.filter((p) => ids.has(p.id));

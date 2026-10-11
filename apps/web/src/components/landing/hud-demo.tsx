@@ -91,7 +91,7 @@ export function HudDemo() {
 
       {/* Guardrail */}
       <div className={`overflow-hidden transition-all duration-300 ${s.guardrail ? "max-h-16 opacity-100" : "max-h-0 opacity-0"}`}>
-        <div className="flex items-center gap-2 border-b border-amber-400/40 bg-amber-400/15 px-4 py-2 text-xs font-semibold text-amber-700 dark:text-amber-200">
+        <div className="flex items-center gap-2 bg-red-500/90 px-4 py-2 text-xs font-semibold text-white">
           <ShieldAlert className="size-4 shrink-0" /> Max Grow is exactly 20%, and only on sales above the DRR. No discounts.
         </div>
       </div>
