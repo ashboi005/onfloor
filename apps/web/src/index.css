@@ -1,36 +1,217 @@
 @import "@onfloor/ui/globals.css";
 
+/* Two solid inks and square geometry follow the OnFloor logo. */
+[class*="rounded-"], button, input, textarea, select {
+  border-radius: 0 !important;
+}
+
+[class*="shadow"], .hud-panel {
+  box-shadow: none;
+}
+
+[class*="drop-shadow"], [class*="backdrop-blur"] {
+  filter: none;
+  backdrop-filter: none;
+}
+
+:is(button, a, input, textarea, select):focus-visible {
+  outline: 2px dashed var(--foreground);
+  outline-offset: 4px;
+}
+
+input[type="range"] {
+  appearance: none;
+  height: 6px;
+  border: 1px solid var(--foreground);
+  background: var(--background);
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 16px;
+  border: 0;
+  border-radius: 0;
+  background: var(--foreground);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 16px;
+  border: 0;
+  border-radius: 0;
+  background: var(--foreground);
+}
+
 .interactive-card {
-  border-radius: 1rem;
+  position: relative;
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  box-shadow: none;
   cursor: pointer;
   text-decoration: none;
-  transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+  transition: background-color 120ms linear, color 120ms linear;
+}
+
+/* Solid stair steps repeat the logo's block rhythm on each card. */
+.interactive-card::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  box-shadow: -6px 0 currentColor, 0 -6px currentColor, -18px -6px currentColor;
+  pointer-events: none;
 }
 
 .interactive-card:is(:hover, :focus-visible),
-.interactive-card-trigger:focus-visible > .interactive-card {
-  border-color: var(--foreground);
-  background-color: var(--foreground);
-  color: var(--background);
+.interactive-card-trigger:focus-visible > .interactive-card,
+.interactive-card-trigger[aria-pressed="true"] > .interactive-card {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
 }
 
 .interactive-card:is(:hover, :focus-visible) *,
-.interactive-card-trigger:focus-visible > .interactive-card * {
-  color: var(--background) !important;
+.interactive-card-trigger:focus-visible > .interactive-card *,
+.interactive-card-trigger[aria-pressed="true"] > .interactive-card * {
+  color: var(--primary-foreground) !important;
+}
+
+.interactive-card-chip {
+  border: 1px solid currentColor;
+  background-color: var(--card);
+  color: var(--card-foreground);
 }
 
 .interactive-card:is(:hover, :focus-visible) .interactive-card-chip,
-.interactive-card-trigger:focus-visible > .interactive-card .interactive-card-chip {
-  background-color: var(--background);
-  color: var(--foreground) !important;
+.interactive-card-trigger:focus-visible > .interactive-card .interactive-card-chip,
+.interactive-card-trigger[aria-pressed="true"] > .interactive-card .interactive-card-chip {
+  background-color: var(--primary);
+  color: var(--primary-foreground) !important;
 }
 
 .interactive-card:focus-visible,
 .interactive-card-trigger:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 3px;
+  outline: 2px dashed var(--ring);
+  outline-offset: 4px;
+}
+
+.persona-action {
+  border-color: var(--primary);
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.interactive-card:is(:hover, :focus-visible) .persona-action {
+  border-color: var(--primary-foreground);
+  background-color: var(--primary-foreground);
+  color: var(--primary) !important;
+}
+
+.hud-panel {
+  border: 1px solid var(--border);
+}
+
+.pixel-meter-track {
+  mask-image: repeating-linear-gradient(to right, #000 0 6px, transparent 6px 8px);
+}
+
+[data-slot="button"]:not(:disabled):hover {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.pixel-accent {
+  position: relative;
+  isolation: isolate;
+}
+
+:is(h1, header).pixel-accent {
+  padding-right: 96px;
+}
+
+.pixel-accent::after {
+  content: "";
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 16px;
+  height: 16px;
+  background: var(--foreground);
+  box-shadow: -16px 0 var(--foreground), 0 16px var(--foreground), -48px 16px var(--foreground), -32px 32px var(--foreground), 16px 48px var(--foreground);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.workspace-header::after {
+  top: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  box-shadow: -24px 0 var(--foreground), -48px 0 var(--foreground), -72px 0 var(--foreground), 0 24px var(--foreground), -24px 24px var(--foreground), -96px 24px var(--foreground), 0 48px var(--foreground), -48px 48px var(--foreground), -72px 72px var(--foreground);
+}
+
+.brand-mosaic {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.brand-mosaic::before,
+.brand-mosaic::after {
+  content: "";
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  background: var(--foreground);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.brand-mosaic::before {
+  top: 32px;
+  left: -16px;
+  box-shadow: 32px 0 var(--foreground), 32px 32px var(--foreground), 64px 64px var(--foreground), 96px 32px var(--foreground);
+}
+
+.brand-mosaic::after {
+  right: -16px;
+  bottom: 32px;
+  box-shadow: -32px 0 var(--foreground), -64px -32px var(--foreground), -32px -64px var(--foreground), -96px 32px var(--foreground);
+}
+
+.brand-hero .crowd-backdrop {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}
+
+.brand-wordmark canvas {
+  filter: none;
+}
+
+.dark .brand-wordmark canvas {
+  filter: brightness(0) invert(1);
+}
+
+@media (max-width: 640px) {
+  .brand-mosaic::before,
+  .brand-mosaic::after {
+    width: 16px;
+    height: 16px;
+  }
+
+  :is(h1, header).pixel-accent {
+    padding-right: 72px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interactive-card {
+    transition: none;
+  }
 }

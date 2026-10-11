@@ -78,11 +78,11 @@ export function HudDemo() {
   const s = stateAt(t);
   const [patience, frustration, engagement] = s.mood;
   return (
-    <div className="relative w-full max-w-5xl overflow-hidden rounded-xl border bg-card/90 text-left shadow-2xl backdrop-blur-md" aria-label="Animated preview of the OnFloor live copilot">
+    <div className="relative w-full max-w-5xl overflow-hidden rounded-xl border bg-card text-left shadow-2xl backdrop-blur-md" aria-label="Animated preview of the OnFloor live copilot">
       {/* Top strip */}
       <div className="flex items-center justify-between gap-3 border-b px-4 py-2.5 text-xs">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex size-2 rounded-full bg-emerald-500" /></span>
+          <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-75" /><span className="relative inline-flex size-2 rounded-full bg-success" /></span>
           <span className="font-semibold">Live</span>
           <span className="truncate text-muted-foreground">Vikas Gupta · Gupta Sweets &amp; Snacks</span>
         </div>
@@ -91,7 +91,7 @@ export function HudDemo() {
 
       {/* Guardrail */}
       <div className={`overflow-hidden transition-all duration-300 ${s.guardrail ? "max-h-16 opacity-100" : "max-h-0 opacity-0"}`}>
-        <div className="flex items-center gap-2 bg-red-500/90 px-4 py-2 text-xs font-semibold text-white">
+        <div className="flex items-center gap-2 border-b-2 border-foreground bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">
           <ShieldAlert className="size-4 shrink-0" /> Max Grow is exactly 20%, and only on sales above the DRR. No discounts.
         </div>
       </div>
@@ -106,13 +106,13 @@ export function HudDemo() {
             return (
               <div
                 key={h.id}
-                className={`animate-in fade-in slide-in-from-top-2 rounded-lg border p-3 duration-500 ${i === 0 ? "border-sky-400/40 bg-sky-400/[0.08]" : "bg-background/50 opacity-80"}`}
+                className={`animate-in fade-in slide-in-from-top-2 rounded-lg border p-3 duration-500 ${i === 0 ? "border-primary bg-card" : "bg-card opacity-80"}`}
               >
-                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-sky-600 dark:text-sky-300"><Icon className="size-3.5" /> {h.kind} assist</div>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-info"><Icon className="size-3.5" /> {h.kind} assist</div>
                 <p className={`mt-1.5 font-semibold ${i === 0 ? "text-base" : "text-sm"}`}>{h.title}</p>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{h.body}</p>
-                <span className="mt-2 inline-flex items-center gap-1 rounded border border-sky-400/30 bg-sky-400/10 px-1.5 py-0.5 text-[10px] text-sky-700 dark:text-sky-200"><BookOpen className="size-3" /> {h.source}</span>
-                <div className="mt-2 h-0.5 overflow-hidden rounded bg-sky-400/15"><div className="h-full bg-sky-500 transition-[width] duration-200 ease-linear" style={{ width: `${left}%` }} /></div>
+                <span className="mt-2 inline-flex items-center gap-1 rounded border border-primary bg-card px-1.5 py-0.5 text-[10px] text-info"><BookOpen className="size-3" /> {h.source}</span>
+                <div className="mt-2 h-0.5 overflow-hidden rounded bg-card"><div className="h-full bg-primary transition-[width] duration-200 ease-linear" style={{ width: `${left}%` }} /></div>
               </div>
             );
           })}
@@ -120,9 +120,9 @@ export function HudDemo() {
 
         {/* Right rail */}
         <div className="flex flex-col gap-3">
-          <div className="rounded-lg border bg-background/50 p-3">
+          <div className="rounded-lg border bg-card p-3">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Customer sentiment</p>
-            {([["Patience", patience, "bg-emerald-500"], ["Frustration", frustration, "bg-rose-500"], ["Engagement", engagement, "bg-sky-500"]] as const).map(([label, v, color]) => (
+            {([["Patience", patience, "bg-success"], ["Frustration", frustration, "bg-destructive"], ["Engagement", engagement, "bg-primary"]] as const).map(([label, v, color]) => (
               <div key={label} className="mb-1.5 last:mb-0">
                 <div className="flex justify-between text-[10px] text-muted-foreground"><span>{label}</span><span className="font-mono">{v}</span></div>
                 <div className="h-1.5 overflow-hidden rounded bg-muted"><div className={`h-full ${color} transition-[width] duration-700`} style={{ width: `${v}%` }} /></div>
@@ -130,14 +130,14 @@ export function HudDemo() {
             ))}
             <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
               <span>Talk</span>
-              <div className="flex h-1.5 flex-1 overflow-hidden rounded bg-violet-400/40"><div className="h-full bg-sky-500 transition-[width] duration-700" style={{ width: `${s.talk}%` }} /></div>
+              <div className="flex h-1.5 flex-1 overflow-hidden rounded bg-card"><div className="h-full bg-primary transition-[width] duration-700" style={{ width: `${s.talk}%` }} /></div>
               <span className="font-mono">{s.talk}% you</span>
             </div>
           </div>
-          <div className="flex min-h-[150px] flex-1 flex-col justify-end gap-2 overflow-hidden rounded-lg border bg-background/50 p-3">
+          <div className="flex min-h-[150px] flex-1 flex-col justify-end gap-2 overflow-hidden rounded-lg border bg-card p-3">
             {s.lines.slice(-4).map((l) => (
-              <div key={l.id} className={`animate-in fade-in slide-in-from-bottom-1 border-l-2 pl-2 duration-500 ${l.who === "agent" ? "border-sky-400" : "border-violet-400"}`}>
-                <p className={`text-[9px] font-semibold uppercase tracking-wider ${l.who === "agent" ? "text-sky-600 dark:text-sky-300" : "text-violet-600 dark:text-violet-300"}`}>{l.who === "agent" ? "You" : "Customer"}</p>
+              <div key={l.id} className={`animate-in fade-in slide-in-from-bottom-1 border-l-2 pl-2 duration-500 ${l.who === "agent" ? "border-primary" : "border-input"}`}>
+                <p className={`text-[9px] font-semibold uppercase tracking-wider ${l.who === "agent" ? "text-info" : "text-muted-foreground"}`}>{l.who === "agent" ? "You" : "Customer"}</p>
                 <p className="text-[11px] leading-snug">{l.en ?? l.text}</p>
               </div>
             ))}

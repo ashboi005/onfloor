@@ -11,10 +11,10 @@ type AuthCardProps = {
 
 export default function AuthCard({ title, eyebrow, description, children }: AuthCardProps) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-5 py-12 text-foreground">
-      <section className="w-full max-w-md rounded-2xl border border-border/80 bg-card p-6 shadow-xl shadow-black/[0.04] sm:p-9 dark:shadow-black/20">
+    <main className="brand-mosaic flex min-h-screen items-center justify-center bg-background px-5 py-12 text-foreground">
+      <section className="pixel-accent w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl shadow-primary/5 sm:p-9">
         <div className="mb-5 flex justify-center">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700 dark:text-blue-300">
+          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-info">
             {eyebrow}
           </span>
         </div>

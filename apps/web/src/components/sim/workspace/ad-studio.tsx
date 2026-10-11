@@ -43,10 +43,10 @@ export function AdStudioTab({ call, callDate }: { call: SimCall; callDate: strin
           <Button type="submit" data-guide="ad_studio.launch" disabled={!type}><Rocket className="size-3.5" /> Launch campaign</Button>
         </div>
       </form>
-      {call.launchError && <p className="text-xs text-red-300">Ad Studio: {call.launchError}</p>}
+      {call.launchError && <p className="text-xs text-destructive">Ad Studio: {call.launchError}</p>}
       {c && (
-        <div className="border border-emerald-400/30 bg-emerald-400/10 p-3 text-xs">
-          <p className="font-semibold text-emerald-300">{CAMPAIGN_TYPE_LABELS[c.campaignType]} {c.status} for {c.restaurantName}</p>
+        <div className="border border-success bg-card p-3 text-xs">
+          <p className="font-semibold text-success">{CAMPAIGN_TYPE_LABELS[c.campaignType]} {c.status} for {c.restaurantName}</p>
           <p className="mt-1">UID {c.uid} · {c.email}</p>
           <p className="mt-1">Dictate: “Your campaign starts {c.startDate === callDate ? "today, " : ""}{spokenDate(c.startDate)}, and runs through {spokenDate(c.endDate)}.”</p>
         </div>

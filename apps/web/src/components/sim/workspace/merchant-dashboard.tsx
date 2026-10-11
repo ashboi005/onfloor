@@ -27,14 +27,14 @@ export function MerchantDashboardTab({ call }: { call: SimCall }) {
         <Input value={uid} onChange={(e) => setUid(e.target.value)} placeholder="Merchant UID (8 digits)" inputMode="numeric" />
         <Button type="submit" size="sm"><Search className="size-3.5" /> Search</Button>
       </form>
-      {result && !m && <p className="text-xs text-red-300">No merchant found for UID {result.uid}.</p>}
+      {result && !m && <p className="text-xs text-destructive">No merchant found for UID {result.uid}.</p>}
       {m && (
         <div className="space-y-4">
           <div>
             <h3 className="text-lg font-semibold">{m.restaurantName}</h3>
             <p className="text-xs text-muted-foreground">UID {m.uid} · {m.cuisines.join(", ")} · {m.outletType.replaceAll("_", " ")} · on Tomato since {m.onTomatoSince.slice(0, 4)}</p>
           </div>
-          <dl data-guide="dashboard.contact" className="grid grid-cols-2 gap-x-4 gap-y-2 border border-border/70 p-3 text-xs">
+          <dl data-guide="dashboard.contact" className="grid grid-cols-2 gap-x-4 gap-y-2 border border-border p-3 text-xs">
             <div><dt className="text-muted-foreground">Owner</dt><dd>{m.ownerName}</dd></div>
             <div><dt className="text-muted-foreground">Phone</dt><dd className="font-mono">{m.phone}</dd></div>
             <div className="col-span-2"><dt className="text-muted-foreground">Email</dt><dd className="font-mono">{m.email}</dd></div>

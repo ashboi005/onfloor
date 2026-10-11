@@ -21,7 +21,7 @@ export default function ScorecardPage() {
   const [subtitleMode, setSubtitleMode] = useSubtitleMode();
 
   if (card.isPending || call.isPending) return <p className="p-8">Loading…</p>;
-  if (call.error) return <p className="p-8 text-red-500">{call.error.message}</p>;
+  if (call.error) return <p className="p-8 text-destructive">{call.error.message}</p>;
   if (card.data === null) {
     return (
       <div className="p-8">
@@ -56,7 +56,7 @@ export default function ScorecardPage() {
       </section>
 
       {sc.deductions.length > 0 && (
-        <section className="rounded-lg border border-red-400/30 bg-red-400/5 p-4 text-sm">
+        <section className="rounded-lg border border-destructive bg-card p-4 text-sm">
           <h2 className="mb-2 font-semibold">QA deductions (−{sc.deductions.reduce((n, d) => n + d.points, 0)})</h2>
           <ul className="space-y-1">
             {sc.deductions.map((d) => (
@@ -104,7 +104,7 @@ export default function ScorecardPage() {
         {c.transcript.map((t) => {
           const m = momentFor(t.id);
           return (
-            <div key={t.id} className={m ? `rounded-md p-2 ${m.severity === "mistake" ? "bg-red-500/10" : m.severity === "warning" ? "bg-amber-500/10" : "bg-emerald-500/10"}` : ""}>
+            <div key={t.id} className={m ? `rounded-md p-2 ${m.severity === "mistake" ? "bg-card" : m.severity === "warning" ? "bg-card" : "bg-card"}` : ""}>
               <span className="text-muted-foreground">{fmt(t.startMs)} {t.speaker}: </span>
               {subtitleText(t, subtitleMode).text}
               {m && (

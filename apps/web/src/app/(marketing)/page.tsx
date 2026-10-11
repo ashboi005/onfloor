@@ -9,26 +9,26 @@ import { ReplayLoop } from "@/components/landing/replay-loop";
 export default function Landing() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <div className="fixed bottom-5 left-5 z-50 rounded-lg bg-background/90 p-1 shadow-lg backdrop-blur-md" aria-label="Appearance">
+      <div className="fixed bottom-5 left-5 z-50 rounded-lg bg-card p-1 shadow-lg backdrop-blur-md" aria-label="Appearance">
         <ModeToggle />
       </div>
       {/* 1. Hero Section */}
-      <section className="relative mx-auto flex w-full flex-col items-center px-6 py-24 text-center md:py-32 overflow-hidden border-b">
-        <CrowdCanvas src="https://cdn.21st.dev/assets/localized/abdb8990a7bef8c2f5af3e45f0a3c969c4b0603fba8be92e81347de4ea4e1ed7.png" rows={15} cols={7} />
+      <section className="brand-hero brand-mosaic relative mx-auto flex w-full flex-col items-center overflow-hidden border-b px-6 py-16 text-center md:py-20">
+        <div className="crowd-backdrop"><CrowdCanvas src="https://cdn.21st.dev/assets/localized/abdb8990a7bef8c2f5af3e45f0a3c969c4b0603fba8be92e81347de4ea4e1ed7.png" rows={15} cols={7} /></div>
         
         <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center">
-          <div className="w-full h-[250px] md:h-[400px] relative mb-2 invert dark:invert-0">
+          <div className="brand-wordmark relative mb-2 h-[200px] w-full md:h-[280px]">
             <TechText
               text="OnFloor"
               fontWeight={800}
-              fontSize={140}
+              fontSize={110}
               reveal="letter"
               dashLength={4}
               dashGap={2}
               specks={15}
               fontFamily=""
-              color="#ffffff"
-              accentColor="#ffffff"
+              color="#193bf2"
+              accentColor="#193bf2"
               letterSpacing={-0.05}
               reach={200}
               softness={0.7}
@@ -42,13 +42,13 @@ export default function Landing() {
             />
           </div>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl mb-6 drop-shadow-sm">
-            Risk-free training. <span className="bg-gradient-to-r from-blue-600 to-teal-600 dark:from-blue-500 dark:to-teal-400 bg-clip-text text-transparent">Win the call.</span>
+            Risk-free training. <span className="text-info">Win the call.</span>
           </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mb-10 bg-background/40 backdrop-blur-sm p-4 rounded-xl border border-border/50">
+          <p className="mb-10 max-w-2xl text-lg leading-relaxed text-muted-foreground">
             Train agents against adversarial AI customers, coach them live during real calls, and get an instant QA score the moment they hang up.
           </p>
           <div className="mb-16 flex justify-center">
-            <Link href="/simulator" className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
+            <Link href="/simulator" className="inline-flex h-12 items-center justify-center rounded-xl bg-primary px-8 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/15 transition-colors hover:bg-card">
               Try simulation <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </div>
@@ -58,7 +58,7 @@ export default function Landing() {
       </section>
 
       {/* 2. The Problem Section */}
-      <section className="bg-muted/30 py-24">
+      <section className="bg-card py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">The old way is broken</h2>
@@ -71,7 +71,7 @@ export default function Landing() {
               { title: "QA Latency", desc: "Calls are scored days later. Feedback arrives too late to change behavior.", stat: "<2% calls reviewed" }
             ].map((item, i) => (
               <div key={i} className="rounded-xl border bg-card p-6 shadow-sm">
-                <div className="text-4xl font-bold text-primary mb-4">{item.stat}</div>
+                <div className="text-4xl font-bold text-info mb-4">{item.stat}</div>
                 <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
                 <p className="text-muted-foreground">{item.desc}</p>
               </div>
@@ -88,21 +88,21 @@ export default function Landing() {
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="flex flex-col items-center text-center p-6">
-              <div className="h-16 w-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 mb-6">
+              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-primary bg-card text-info">
                 <Bot className="h-8 w-8" />
               </div>
               <h3 className="text-2xl font-bold mb-3">Simulator</h3>
               <p className="text-muted-foreground">Practice tough scenarios with AI personas that bite back. Integrated with a mock CRM.</p>
             </div>
             <div className="flex flex-col items-center text-center p-6">
-              <div className="h-16 w-16 rounded-full bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center text-teal-600 dark:text-teal-400 mb-6">
+              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-primary bg-card text-info">
                 <Activity className="h-8 w-8" />
               </div>
               <h3 className="text-2xl font-bold mb-3">Shadow AI Copilot</h3>
               <p className="text-muted-foreground">Live hints, sentiment analysis, and guardrails right on the agent's screen during real calls.</p>
             </div>
             <div className="flex flex-col items-center text-center p-6">
-              <div className="h-16 w-16 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 mb-6">
+              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-primary bg-card text-info">
                 <Zap className="h-8 w-8" />
               </div>
               <h3 className="text-2xl font-bold mb-3">Instant QA</h3>
@@ -113,7 +113,7 @@ export default function Landing() {
       </section>
 
       {/* 4. The Replay Loop */}
-      <section className="bg-muted/30 py-24">
+      <section className="bg-card py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -148,7 +148,7 @@ export default function Landing() {
         <div className="mx-auto max-w-6xl px-6 grid md:grid-cols-2 gap-16">
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <Globe className="h-6 w-6 text-primary" />
+              <Globe className="h-6 w-6 text-info" />
               <h3 className="text-2xl font-bold">Speaks your language</h3>
             </div>
             <p className="text-muted-foreground mb-6">
@@ -162,7 +162,7 @@ export default function Landing() {
           </div>
           <div>
              <div className="flex items-center gap-3 mb-4">
-              <Server className="h-6 w-6 text-primary" />
+              <Server className="h-6 w-6 text-info" />
               <h3 className="text-2xl font-bold">Powered by the best</h3>
             </div>
             <p className="text-muted-foreground mb-8">
