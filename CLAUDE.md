@@ -12,4 +12,4 @@ Rules:
   (`core/calls.ts`, module `index.ts` files); expected failures throw `AppError`.
 - Never add a catch-all `GET /*` route to Elysia (it swallows `/api/auth/*`).
 - Env vars are declared in `.env.schema` (varlock); run `bun run env:generate` after editing one.
-- Stay in your owner's folders (see README "Layout & owners"). No tests required; run `bun run check-types`.
+- Stay in your owner's folders (see `docs/specs/00-overview.md` §2 and the README repo layout). No tests required; run `bun run check-types`.

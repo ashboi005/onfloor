@@ -66,3 +66,6 @@ apps/telegram-bridge/recordings/
 
 # Local storage / scratch (recordings, TTS samples)
 .data/
+
+# Drafts kept out of git (dev.to blog)
+docs/blog/
